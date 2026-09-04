@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Food Price AI</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/style.css"
+    >
+</head>
+
+<body>
+
+    <!-- =========================
+         GLOBAL NAVIGATION
+    ========================== -->
+
+    <header class="topbar">
+
+        <a
+            href="#home"
+            class="brand"
+            data-page="home"
+        >
+            <span class="brand-icon">🌾</span>
+            <span>Food Price AI</span>
+        </a>
+
+        <div class="menu-wrapper">
+
+            <button
+                id="menu-button"
+                class="menu-button"
+                aria-label="Open menu"
+            >
+                ⋮
+            </button>
+
+            <div
+                id="dropdown-menu"
+                class="dropdown-menu hidden"
+            >
+                <button data-page="home">
+                    Home
+                </button>
+
+                <button data-page="about">
+                    About
+                </button>
+
+                <button data-page="guide">
+                    Guide
+                </button>
+
+                <button data-page="contact">
+                    Contact
+                </button>
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- =========================
+         MAIN APPLICATION
+    ========================== -->
+
+    <main id="app">
+
+
+        <!-- =====================
+             HOME PAGE
+        ====================== -->
+
+        <section
+            id="home-page"
+            class="page active"
+        >
+
+            <div class="hero">
+
+                <div class="hero-content">
+
+                    <div class="badge">
+                        AI-Powered Food Forecasting
+                    </div>
+
+                    <h1>
+                        Predict Food Commodity Prices
+                        with Artificial Intelligence
+                    </h1>
+
+                    <p class="hero-description">
+                        Forecast future food commodity prices
+                        using trained machine learning and
+                        deep learning models.
+                    </p>
+
+                    <button
+                        id="start-prediction-button"
+                        class="primary-button"
+                    >
+                        Start Prediction
+                        <span>→</span>
+                    </button>
+
+                </div>
+
+                <div class="hero-visual">
+
+                    <div class="prediction-card">
+
+                        <div class="prediction-card-header">
+                            <span>AI Forecast</span>
+                            <span class="status-dot"></span>
+                        </div>
+
+                        <div class="chart-placeholder">
+
+                            <div class="chart-line">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+
+                        </div>
+
+                        <div class="forecast-value">
+                            <span>Predicted Price</span>
+                            <strong>113.11 ETB/KG</strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="features-section">
+
+                <div class="section-heading">
+                    <span class="small-label">
+                        THE SYSTEM
+                    </span>
+
+                    <h2>
+                        Intelligent Price Forecasting
+                    </h2>
+
+                    <p>
+                        Our system combines historical market
+                        data with multiple AI models to generate
+                        food commodity price forecasts.
+                    </p>
+                </div>
+
+
+                <div class="feature-grid">
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🤖</div>
+
+                        <h3>
+                            Multiple AI Models
+                        </h3>
+
+                        <p>
+                            Compare predictions from eight
+                            trained machine learning and
+                            deep learning models.
+                        </p>
+                    </div>
+
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+
+                        <h3>
+                            Data-Driven
+                        </h3>
+
+                        <p>
+                            Predictions are based on historical
+                            food commodity market prices and
+                            engineered time-series features.
+                        </p>
+                    </div>
+
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+
+                        <h3>
+                            Model Comparison
+                        </h3>
+
+                        <p>
+                            Examine model performance using
+                            MAE, MSE, RMSE and R² metrics.
+                        </p>
+                    </div>
+
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📈</div>
+
+                        <h3>
+                            Actual vs Predicted
+                        </h3>
+
+                        <p>
+                            For historical dates, compare the
+                            predicted price with the actual
+                            recorded market price.
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================
+             PREDICTION PAGE
+        ====================== -->
+
+        <section
+            id="prediction-page"
+            class="page"
+        >
+
+            <div class="page-container">
+
+                <div class="page-header">
+
+                    <span class="small-label">
+                        PRICE FORECAST
+                    </span>
+
+                    <h1>
+                        Make a Prediction
+                    </h1>
+
+                    <p>
+                        Select a commodity, market and target
+                        month to generate an AI price forecast.
+                    </p>
+
+                </div>
+
+
+                <div class="prediction-form-card">
+
+                    <div class="form-group">
+
+                        <label for="commodity">
+                            Commodity
+                        </label>
+
+                        <select id="commodity">
+                            <option value="">
+                                Loading commodities...
+                            </option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="form-group">
+
+                        <label for="market">
+                            Market
+                        </label>
+
+                        <select id="market">
+                            <option value="">
+                                Select a commodity first
+                            </option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label for="target-month">
+                                Target Month
+                            </label>
+
+                            <select id="target-month">
+
+                                <option value="">
+                                    Select month
+                                </option>
+
+                                <option value="1">
+                                    January
+                                </option>
+
+                                <option value="2">
+                                    February
+                                </option>
+
+                                <option value="3">
+                                    March
+                                </option>
+
+                                <option value="4">
+                                    April
+                                </option>
+
+                                <option value="5">
+                                    May
+                                </option>
+
+                                <option value="6">
+                                    June
+                                </option>
+
+                                <option value="7">
+                                    July
+                                </option>
+
+                                <option value="8">
+                                    August
+                                </option>
+
+                                <option value="9">
+                                    September
+                                </option>
+
+                                <option value="10">
+                                    October
+                                </option>
+
+                                <option value="11">
+                                    November
+                                </option>
+
+                                <option value="12">
+                                    December
+                                </option>
+
+                            </select>
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label for="target-year">
+                                Target Year
+                            </label>
+
+                            <select id="target-year">
+                                <!-- Filled by JavaScript -->
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="form-error"
+                        class="form-error hidden"
+                    ></div>
+
+
+                    <button
+                        id="predict-button"
+                        class="primary-button full-width"
+                    >
+                        <span>Predict Price</span>
+                        <span>→</span>
+                    </button>
+
+                </div>
+
+
+                <div class="info-box">
+
+                    <span class="info-icon">
+                        ℹ
+                    </span>
+
+                    <p>
+                        The system uses the previous month's
+                        available market information to forecast
+                        the selected target month.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================
+             LOADING PAGE
+        ====================== -->
+
+        <section
+            id="loading-page"
+            class="page"
+        >
+
+            <div class="loading-container">
+
+                <div class="ai-loader">
+
+                    <div class="loader-ring"></div>
+
+                    <div class="loader-icon">
+                        🤖
+                    </div>
+
+                </div>
+
+                <h1>
+                    AI is Predicting...
+                </h1>
+
+                <p id="loading-message">
+                    Analyzing historical market data
+                </p>
+
+                <div class="loading-progress">
+                    <div
+                        id="loading-progress-bar"
+                        class="loading-progress-bar"
+                    ></div>
+                </div>
+
+                <span class="loading-note">
+                    Please wait while the AI models
+                    generate your forecast.
+                </span>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================
+             RESULTS PAGE
+        ====================== -->
+
+        <section
+            id="results-page"
+            class="page"
+        >
+
+            <div class="page-container results-container">
+
+                <div class="results-header">
+
+                    <div>
+
+                        <span class="small-label">
+                            FORECAST RESULT
+                        </span>
+
+                        <h1 id="result-title">
+                            Price Prediction
+                        </h1>
+
+                        <p id="result-subtitle">
+                            <!-- Filled by JavaScript -->
+                        </p>
+
+                    </div>
+
+
+                    <div class="result-model-selector">
+
+                        <label for="result-model-select">
+                            Model
+                        </label>
+
+                        <select id="result-model-select">
+                            <!-- Filled by JavaScript -->
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Main prediction -->
+
+                <div class="main-result-card">
+
+                    <div class="result-card-label">
+                        Predicted Price
+                    </div>
+
+                    <div
+                        id="main-prediction"
+                        class="main-prediction"
+                    >
+                        --
+                    </div>
+
+                    <div
+                        id="prediction-unit"
+                        class="prediction-unit"
+                    >
+                        ETB/KG
+                    </div>
+
+                    <div
+                        id="prediction-status"
+                        class="prediction-status"
+                    >
+                    </div>
+
+                </div>
+
+
+                <!-- Actual comparison -->
+
+                <div
+                    id="comparison-section"
+                    class="comparison-section"
+                >
+
+                    <div class="comparison-card">
+
+                        <span>
+                            Actual Price
+                        </span>
+
+                        <strong id="actual-price">
+                            --
+                        </strong>
+
+                    </div>
+
+
+                    <div class="comparison-card">
+
+                        <span>
+                            Absolute Error
+                        </span>
+
+                        <strong id="absolute-error">
+                            --
+                        </strong>
+
+                    </div>
+
+
+                    <div class="comparison-card">
+
+                        <span>
+                            Percentage Error
+                        </span>
+
+                        <strong id="percentage-error">
+                            --
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Forecast information -->
+
+                <div class="details-grid">
+
+                    <div class="details-card">
+
+                        <h3>
+                            Forecast Details
+                        </h3>
+
+                        <div class="detail-row">
+                            <span>Commodity</span>
+                            <strong id="detail-commodity">--</strong>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Market</span>
+                            <strong id="detail-market">--</strong>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Target Date</span>
+                            <strong id="detail-target-date">--</strong>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Source Date</span>
+                            <strong id="detail-source-date">--</strong>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Model</span>
+                            <strong id="detail-model">--</strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="details-card">
+
+                        <h3>
+                            Model Performance
+                        </h3>
+
+                        <div class="metric-row">
+                            <span>MAE</span>
+                            <strong id="metric-mae">--</strong>
+                        </div>
+
+                        <div class="metric-row">
+                            <span>MSE</span>
+                            <strong id="metric-mse">--</strong>
+                        </div>
+
+                        <div class="metric-row">
+                            <span>RMSE</span>
+                            <strong id="metric-rmse">--</strong>
+                        </div>
+
+                        <div class="metric-row">
+                            <span>R²</span>
+                            <strong id="metric-r2">--</strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Actual vs predicted -->
+
+                <div
+                    id="actual-predicted-section"
+                    class="chart-section"
+                >
+
+                    <div class="chart-header">
+
+                        <div>
+                            <span class="small-label">
+                                PERFORMANCE
+                            </span>
+
+                            <h2>
+                                Actual vs Predicted
+                            </h2>
+                        </div>
+
+                    </div>
+
+                    <div class="comparison-visual">
+
+                        <div class="visual-bar">
+
+                            <span>
+                                Actual
+                            </span>
+
+                            <div class="bar-track">
+                                <div
+                                    id="actual-bar"
+                                    class="bar-fill actual-bar"
+                                ></div>
+                            </div>
+
+                            <strong id="visual-actual">
+                                --
+                            </strong>
+
+                        </div>
+
+
+                        <div class="visual-bar">
+
+                            <span>
+                                Predicted
+                            </span>
+
+                            <div class="bar-track">
+                                <div
+                                    id="predicted-bar"
+                                    class="bar-fill predicted-bar"
+                                ></div>
+                            </div>
+
+                            <strong id="visual-predicted">
+                                --
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- All models -->
+
+                <div class="models-section">
+
+                    <div class="section-heading left">
+
+                        <span class="small-label">
+                            MODEL COMPARISON
+                        </span>
+
+                        <h2>
+                            All Available Models
+                        </h2>
+
+                        <p>
+                            Compare predictions from every
+                            trained model in the system.
+                        </p>
+
+                    </div>
+
+
+                    <div
+                        id="models-grid"
+                        class="models-grid"
+                    >
+                        <!-- Filled by JavaScript -->
+                    </div>
+
+                </div>
+
+
+                <button
+                    id="new-prediction-button"
+                    class="secondary-button"
+                >
+                    ← Make Another Prediction
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================
+             ABOUT PAGE
+        ====================== -->
+
+        <section
+            id="about-page"
+            class="page"
+        >
+
+            <div class="page-container content-page">
+
+                <span class="small-label">
+                    ABOUT THE SYSTEM
+                </span>
+
+                <h1>
+                    About Food Price AI
+                </h1>
+
+                <p>
+                    Food Price AI is an artificial intelligence
+                    based food commodity price forecasting system.
+                    It uses historical market price information
+                    to estimate future commodity prices.
+                </p>
+
+                <p>
+                    The system combines traditional machine
+                    learning algorithms with deep learning
+                    approaches. This allows users to compare
+                    different modeling techniques and understand
+                    how each model performs.
+                </p>
+
+                <h2>
+                    Why Multiple Models?
+                </h2>
+
+                <p>
+                    No single forecasting algorithm is guaranteed
+                    to perform best for every situation. By
+                    providing multiple models, the system makes
+                    it possible to compare their predictions and
+                    performance using standardized evaluation
+                    metrics.
+                </p>
+
+                <h2>
+                    Models Used
+                </h2>
+
+                <ul class="model-list">
+                    <li>Linear Regression</li>
+                    <li>Random Forest</li>
+                    <li>Gradient Boosting</li>
+                    <li>Stacking Regression</li>
+                    <li>Neural Network</li>
+                    <li>LSTM</li>
+                    <li>Round 1 Linear Regression</li>
+                    <li>Round 1 Random Forest</li>
+                </ul>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================
+             GUIDE PAGE
+        ====================== -->
+
+        <section
+            id="guide-page"
+            class="page"
+        >
+
+            <div class="page-container content-page">
+
+                <span class="small-label">
+                    USER GUIDE
+                </span>
+
+                <h1>
+                    How to Use the System
+                </h1>
+
+
+                <div class="guide-step">
+
+                    <span class="step-number">
+                        01
+                    </span>
+
+                    <div>
+                        <h2>
+                            Select a Commodity
+                        </h2>
+
+                        <p>
+                            Choose the food commodity that you
+                            want to forecast.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="guide-step">
+
+                    <span class="step-number">
+                        02
+                    </span>
+
+                    <div>
+                        <h2>
+                            Select a Market
+                        </h2>
+
+                        <p>
+                            Choose the market where the commodity
+                            is sold.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="guide-step">
+
+                    <span class="step-number">
+                        03
+                    </span>
+
+                    <div>
+                        <h2>
+                            Select Month and Year
+                        </h2>
+
+                        <p>
+                            Select the month and year for which
+                            you want a price forecast.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="guide-step">
+
+                    <span class="step-number">
+                        04
+                    </span>
+
+                    <div>
+                        <h2>
+                            Generate Prediction
+                        </h2>
+
+                        <p>
+                            Click Predict Price. The AI system
+                            analyzes the available historical
+                            information and generates a forecast.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="guide-step">
+
+                    <span class="step-number">
+                        05
+                    </span>
+
+                    <div>
+                        <h2>
+                            Compare Models
+                        </h2>
+
+                        <p>
+                            After the prediction is generated,
+                            you can switch between the eight
+                            available models and compare their
+                            predictions.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="guide-note">
+
+                    <strong>
+                        Important:
+                    </strong>
+
+                    Actual prices are displayed only when the
+                    selected target date already exists in the
+                    historical dataset. Future dates do not have
+                    an actual value yet.
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =====================
+             CONTACT PAGE
+        ====================== -->
+
+        <section
+            id="contact-page"
+            class="page"
+        >
+
+            <div class="page-container content-page contact-page">
+
+                <span class="small-label">
+                    CONTACT
+                </span>
+
+                <h1>
+                    Get in Touch
+                </h1>
+
+                <p>
+                    Have a question, suggestion or feedback
+                    about the Food Price AI system?
+                </p>
+
+
+                <div class="contact-card">
+
+                    <div class="contact-item">
+
+                        <span class="contact-icon">
+                            ✈
+                        </span>
+
+                        <div>
+                            <span>
+                                Telegram
+                            </span>
+
+                            <strong>
+                                <a href="https://t.me/AI_engineers_team" target="_blank">
+                                    @AI_engineers_team
+                                </a>
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="contact-item">
+
+                        <span class="contact-icon">
+                            ✉
+                        </span>
+
+                        <div>
+                            <span>
+                                Email
+                            </span>
+
+                            <strong>
+                                <a href="https://mail.google.com/mail/?view=cm&fs=1&to=aiengineersteam01@gmail.com" target="_blank">
+                                    aiengineersteam01@gmail.com
+                                </a>
+                            </strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- =========================
+         JAVASCRIPT
+    ========================== -->
+
+    <script src="/static/app.js"></script>
+
+</body>
+</html>
