@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+import gc
 
 import joblib
 import pandas as pd
@@ -122,21 +123,18 @@ class ModelManager:
 
         self.project_root = Path(project_root)
 
+        # IMPORTANT FOR LOW-MEMORY HOSTING:
+        # Keep only the currently requested model in memory.
+        # The old implementation loaded all 8 models at startup,
+        # which exceeded Render's 512 MB free-instance limit.
         self.models: dict[str, Any] = {}
+        self._loaded_model_id: str | None = None
 
-        # Load model performance information.
+        # Load only the small performance CSV at startup.
         self.performance = self._load_performance()
 
-        # Load every available trained model.
-        self._load_all_models()
-
-        if not self.models:
-            raise RuntimeError(
-                "No trained models could be loaded. "
-                "Please check the models directory."
-            )
-
-        # Select the default model.
+        # Choose the best model from the performance table without
+        # loading any model files.
         self.default_model_id = self._select_default_model()
 
     # =============================================================
@@ -237,7 +235,9 @@ class ModelManager:
                         row,
                         "r2",
                     ),
-                    "available": model_id in self.models,
+                    "available": (
+                        self.project_root / definition["path"]
+                    ).exists(),
                     "round": definition.get(
                         "round"
                     ),
@@ -253,52 +253,85 @@ class ModelManager:
     # MODEL LOADING
     # =============================================================
 
-    def _load_all_models(self) -> None:
+    def _load_model(self, model_id: str) -> Any:
         """
-        Load all trained models defined in MODEL_DEFINITIONS.
+        Load exactly one model into memory.
+
+        Only one model is kept in memory at a time. This is important
+        for low-memory hosting such as Render's 512 MB free instance.
         """
+        definition = self.MODEL_DEFINITIONS.get(model_id)
 
-        for model_id, definition in self.MODEL_DEFINITIONS.items():
+        if definition is None:
+            raise ValueError(f"Unknown model: {model_id}")
 
-            path = self.project_root / definition["path"]
+        path = self.project_root / definition["path"]
 
-            if not path.exists():
-                print(
-                    f"[ModelManager] Model file not found: "
-                    f"{path}"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Model file not found: {path}"
+            )
+
+        # If another model is already loaded, release it first.
+        if self._loaded_model_id is not None:
+            self._unload_current_model()
+
+        try:
+            if definition["type"] == "joblib":
+                model = joblib.load(path)
+
+            elif definition["type"] == "keras":
+                model = self._load_keras_model(path)
+
+            else:
+                raise ValueError(
+                    f"Unsupported model type: {definition['type']}"
                 )
-                continue
 
+        except Exception as exc:
+            print(
+                f"[ModelManager] Failed to load "
+                f"{model_id}: {exc}"
+            )
+            raise
+
+        self.models[model_id] = model
+        self._loaded_model_id = model_id
+
+        print(
+            f"[ModelManager] Loaded on demand: "
+            f"{model_id} -> {path}"
+        )
+
+        return model
+
+    def _unload_current_model(self) -> None:
+        """
+        Release the currently loaded model and request garbage
+        collection so large Random Forest / TensorFlow objects do not
+        accumulate in memory.
+        """
+        if self._loaded_model_id is None:
+            return
+
+        old_model_id = self._loaded_model_id
+        old_model = self.models.pop(old_model_id, None)
+
+        if old_model is not None:
+            del old_model
+
+        self._loaded_model_id = None
+
+        # Clear TensorFlow state when a Keras model was loaded.
+        old_definition = self.MODEL_DEFINITIONS.get(old_model_id)
+        if old_definition and old_definition["type"] == "keras":
             try:
+                import tensorflow as tf
+                tf.keras.backend.clear_session()
+            except Exception:
+                pass
 
-                if definition["type"] == "joblib":
-
-                    model = joblib.load(path)
-
-                elif definition["type"] == "keras":
-
-                    model = self._load_keras_model(path)
-
-                else:
-
-                    raise ValueError(
-                        f"Unsupported model type: "
-                        f"{definition['type']}"
-                    )
-
-                self.models[model_id] = model
-
-                print(
-                    f"[ModelManager] Loaded: "
-                    f"{model_id} -> {path}"
-                )
-
-            except Exception as exc:
-
-                print(
-                    f"[ModelManager] Failed to load "
-                    f"{model_id}: {exc}"
-                )
+        gc.collect()
 
     @staticmethod
     def _load_keras_model(path: Path):
@@ -348,7 +381,14 @@ class ModelManager:
                     str(row[model_column])
                 )
 
-                if model_id not in self.models:
+                definition = self.MODEL_DEFINITIONS.get(model_id)
+
+                if definition is None:
+                    continue
+
+                model_path = self.project_root / definition["path"]
+
+                if not model_path.exists():
                     continue
 
                 try:
@@ -377,15 +417,21 @@ class ModelManager:
 
                 return available_rows[0][1]
 
-        # Fallback order.
+        # Fallback order based on model files, not loaded models.
         for model_id in self.DEFAULT_MODEL_ORDER:
+            definition = self.MODEL_DEFINITIONS.get(model_id)
 
-            if model_id in self.models:
+            if definition is None:
+                continue
+
+            model_path = self.project_root / definition["path"]
+
+            if model_path.exists():
                 return model_id
 
-        # Final fallback.
-        return next(
-            iter(self.models)
+        raise RuntimeError(
+            "No trained model files are available. "
+            "Please check the models directory."
         )
 
     # =============================================================
@@ -397,26 +443,27 @@ class ModelManager:
         model_id: str | None = None,
     ):
         """
-        Return a loaded model.
+        Return a model, loading it only when it is requested.
 
-        If model_id is None, return the default model.
+        Only one model is kept in memory at a time. This preserves the
+        existing model selector while avoiding the startup out-of-memory
+        error on low-memory hosting.
         """
 
         if model_id is None:
             model_id = self.default_model_id
 
-        if model_id not in self.models:
-
-            available = ", ".join(
-                self.models.keys()
-            )
-
+        if model_id not in self.MODEL_DEFINITIONS:
             raise ValueError(
-                f"Model '{model_id}' is not available. "
-                f"Available models: {available}"
+                f"Unknown model: {model_id}"
             )
 
-        return self.models[model_id]
+        # Reuse the currently loaded model when possible.
+        if self._loaded_model_id == model_id:
+            return self.models[model_id]
+
+        # Otherwise load only the requested model.
+        return self._load_model(model_id)
 
     # =============================================================
     # MODEL INFORMATION
@@ -462,7 +509,9 @@ class ModelManager:
             "model_name": definition["name"],
             "round": definition["round"],
             "category": definition["category"],
-            "available": model_id in self.models,
+            "available": (
+                self.project_root / definition["path"]
+            ).exists(),
             "is_default": (
                 model_id == self.default_model_id
             ),
@@ -485,7 +534,9 @@ class ModelManager:
                 "model_name": self.get_model_name(
                     model_id
                 ),
-                "available": model_id in self.models,
+                "available": (
+                self.project_root / definition["path"]
+            ).exists(),
                 "is_default": (
                     model_id == self.default_model_id
                 ),
