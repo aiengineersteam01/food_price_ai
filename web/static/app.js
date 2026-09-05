@@ -1,857 +1,1978 @@
-// Food Price AI - Frontend JavaScript
+console.log("Food Price AI JavaScript file loaded.");
 
-document.addEventListener("DOMContentLoaded", () => {
-    initializeApp();
-});
+document.addEventListener("DOMContentLoaded", function () {
 
+    console.log("Food Price AI JavaScript initialized.");
 
-// ============================================================
-// GLOBAL STATE
-// ============================================================
+    /* =====================================================
+       ELEMENTS
+       ===================================================== */
 
-window.foodPriceLastRequest = null;
-window.foodPricePerformance = [];
-window.selectedFoodPriceModel = "lstm";
+    const startButton =
+        document.getElementById("start-prediction-button");
 
+    const predictButton =
+        document.getElementById("predict-button");
 
-// ============================================================
-// INITIALIZATION
-// ============================================================
+    const newPredictionButton =
+        document.getElementById("new-prediction-button");
 
-async function initializeApp() {
-    setupNavigation();
-    setupPredictionForm();
-    setupModelSelector();
-    setupMenu();
+    const returnToPredictionButton =
+        document.getElementById("return-to-prediction-button");
 
-    // Load lightweight model performance information.
-    // This does NOT load the actual ML model files.
-    await loadModelPerformance();
-}
+    const menuButton =
+        document.getElementById("menu-button");
 
+    const dropdownMenu =
+        document.getElementById("dropdown-menu");
 
-// ============================================================
-// NAVIGATION
-// ============================================================
+    const commoditySelect =
+        document.getElementById("commodity");
 
-function setupNavigation() {
-    const homeButtons = document.querySelectorAll("[data-page='home']");
-    
-    homeButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            showPage("home");
-        });
-    });
+    const marketSelect =
+        document.getElementById("market");
 
-    const aboutButtons = document.querySelectorAll("[data-page='about']");
-    
-    aboutButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            showPage("about");
-        });
-    });
+    const monthSelect =
+        document.getElementById("target-month");
 
-    const contactButtons = document.querySelectorAll("[data-page='contact']");
-    
-    contactButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            showPage("contact");
-        });
-    });
+    const yearSelect =
+        document.getElementById("target-year");
 
-    const guideButtons = document.querySelectorAll("[data-page='guide']");
-    
-    guideButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            showPage("guide");
-        });
-    });
-}
+    const formError =
+        document.getElementById("form-error");
 
+    const modelSelect =
+        document.getElementById("result-model-select");
 
-function showPage(pageName) {
-    const pages = document.querySelectorAll(".page");
 
-    pages.forEach(page => {
-        page.classList.remove("active");
-    });
+    /* =====================================================
+       GLOBAL STATE
+       ===================================================== */
 
-    const targetPage = document.getElementById(`${pageName}-page`);
-
-    if (targetPage) {
-        targetPage.classList.add("active");
-    }
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
-}
-
-
-// ============================================================
-// THREE-DOT MENU
-// ============================================================
-
-function setupMenu() {
-    const menuButton = document.querySelector(".menu-button");
-    const menu = document.querySelector(".dropdown-menu");
-
-    if (!menuButton || !menu) {
-        return;
-    }
-
-    menuButton.addEventListener("click", (event) => {
-        event.stopPropagation();
-        menu.classList.toggle("show");
-    });
-
-    document.addEventListener("click", () => {
-        menu.classList.remove("show");
-    });
-
-    menu.addEventListener("click", (event) => {
-        event.stopPropagation();
-    });
-}
-
-
-// ============================================================
-// PREDICTION FORM
-// ============================================================
-
-function setupPredictionForm() {
-    const form = document.getElementById("prediction-form");
-
-    if (!form) {
-        return;
-    }
-
-    form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-
-        const commodityElement = document.getElementById("commodity");
-        const marketElement = document.getElementById("market");
-        const monthElement = document.getElementById("month");
-        const yearElement = document.getElementById("year");
-        const modelElement = document.getElementById("model");
-
-        if (
-            !commodityElement ||
-            !marketElement ||
-            !monthElement ||
-            !yearElement
-        ) {
-            console.error("Prediction form fields are missing.");
-            return;
-        }
-
-        const modelId =
-            modelElement?.value ||
-            window.selectedFoodPriceModel ||
-            "lstm";
-
-        const request = {
-            commodity: commodityElement.value,
-            market: marketElement.value,
-            month: parseInt(monthElement.value),
-            year: parseInt(yearElement.value),
-            model_id: modelId
-        };
-
-        await makePrediction(request);
-    });
-}
-
-
-// ============================================================
-// MAKE ONE PREDICTION
-// ============================================================
-
-async function makePrediction(request) {
-    try {
-        showLoading();
-
-        // Save the request so that changing the model can
-        // repeat the same prediction with ONLY the new model.
-        window.foodPriceLastRequest = {
-            ...request
-        };
-
-        const modelId =
-            request.model_id ||
-            window.selectedFoodPriceModel ||
-            "lstm";
-
-        window.selectedFoodPriceModel = modelId;
-
-        const payload = {
-            commodity: request.commodity,
-            market: request.market,
-            month: request.month,
-            year: request.year,
-            model_id: modelId
-        };
-
-        console.log("Sending prediction request:", payload);
-
-        // IMPORTANT:
-        // Use /api/predict, NOT /api/predict/all.
-        //
-        // /api/predict/all loads every model and causes the
-        // Render 512 MB instance to run out of memory.
-        const response = await fetch("/api/predict", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            let errorMessage = `Prediction failed (${response.status})`;
-
-            try {
-                const errorData = await response.json();
-
-                if (errorData.detail) {
-                    errorMessage = errorData.detail;
-                } else if (errorData.message) {
-                    errorMessage = errorData.message;
-                }
-            } catch (error) {
-                console.error("Could not read error response:", error);
-            }
-
-            throw new Error(errorMessage);
-        }
-
-        const rawData = await response.json();
-
-        console.log("Prediction response:", rawData);
-
-        hideLoading();
-
-        /*
-         * The backend /api/predict endpoint returns ONE model result.
-         *
-         * The existing results page was designed around an array
-         * called "predictions", so we normalize the response here.
-         */
-        const data = {
-            ...rawData,
-            default_model: rawData.model_id || modelId,
-            predictions: [rawData]
-        };
-
-        window.foodPriceLastResult = data;
-
-        displayResults(data);
-
-    } catch (error) {
-        console.error("Prediction error:", error);
-
-        hideLoading();
-
-        showUnavailable(
-            error.message ||
-            "Unable to make the prediction. Please try again."
-        );
-    }
-}
-
-
-// ============================================================
-// LOADING SCREEN
-// ============================================================
-
-function showLoading() {
-    const loadingPage = document.getElementById("loading-page");
-
-    if (loadingPage) {
-        loadingPage.classList.add("active");
-    }
-
-    const pages = document.querySelectorAll(".page");
-
-    pages.forEach(page => {
-        if (page.id !== "loading-page") {
-            page.classList.remove("active");
-        }
-    });
-
-    // Keep the AI loading experience visible for at least 5 seconds.
-    window.predictionLoadingStart = Date.now();
-}
-
-
-async function hideLoading() {
-    const start = window.predictionLoadingStart || Date.now();
-
-    const elapsed = Date.now() - start;
-    const minimumLoadingTime = 5000;
-
-    if (elapsed < minimumLoadingTime) {
-        await new Promise(resolve => {
-            setTimeout(
-                resolve,
-                minimumLoadingTime - elapsed
-            );
-        });
-    }
-
-    const loadingPage = document.getElementById("loading-page");
-
-    if (loadingPage) {
-        loadingPage.classList.remove("active");
-    }
-}
-
-
-// ============================================================
-// RESULTS
-// ============================================================
-
-function displayResults(data) {
-    const resultsPage = document.getElementById("results-page");
-
-    if (!resultsPage) {
-        console.error("Results page not found.");
-        return;
-    }
-
-    const predictions = data.predictions || [];
-
-    if (predictions.length === 0) {
-        showUnavailable("No prediction result was returned.");
-        return;
-    }
-
-    const prediction = predictions[0];
-
-    populateResultDetails(prediction);
-
-    populateModelSelector(prediction);
-
-    resultsPage.classList.add("active");
-
-    const pages = document.querySelectorAll(".page");
-
-    pages.forEach(page => {
-        if (page.id !== "results-page") {
-            page.classList.remove("active");
-        }
-    });
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
-}
-
-
-// ============================================================
-// RESULT DETAILS
-// ============================================================
-
-function populateResultDetails(prediction) {
-    /*
-     * The exact element IDs may differ depending on the current
-     * HTML. We check multiple common IDs so the frontend remains
-     * compatible with the existing page.
-     */
-
-    setText(
-        [
-            "result-commodity",
-            "prediction-commodity"
-        ],
-        prediction.commodity
-    );
-
-    setText(
-        [
-            "result-market",
-            "prediction-market"
-        ],
-        prediction.market
-    );
-
-    setText(
-        [
-            "result-month",
-            "prediction-month"
-        ],
-        formatMonth(prediction.month)
-    );
-
-    setText(
-        [
-            "result-year",
-            "prediction-year"
-        ],
-        prediction.year
-    );
-
-    setText(
-        [
-            "result-model",
-            "prediction-model",
-            "selected-model"
-        ],
-        formatModelName(
-            prediction.model_id ||
-            prediction.model ||
-            window.selectedFoodPriceModel
-        )
-    );
-
-    const predictedPrice =
-        prediction.predicted_price ??
-        prediction.prediction ??
-        prediction.price;
-
-    if (predictedPrice !== undefined && predictedPrice !== null) {
-        setText(
-            [
-                "predicted-price",
-                "prediction-price",
-                "result-price"
-            ],
-            formatPrice(predictedPrice)
-        );
-    }
-
-    const actualPrice =
-        prediction.actual_price ??
-        prediction.actual;
-
-    if (actualPrice !== undefined && actualPrice !== null) {
-        setText(
-            [
-                "actual-price",
-                "result-actual"
-            ],
-            formatPrice(actualPrice)
-        );
-    }
-
-    const absoluteError =
-        prediction.absolute_error ??
-        prediction.error;
-
-    if (absoluteError !== undefined && absoluteError !== null) {
-        setText(
-            [
-                "absolute-error",
-                "result-error"
-            ],
-            formatPrice(absoluteError)
-        );
-    }
-
-    const percentageError =
-        prediction.percentage_error ??
-        prediction.percent_error ??
-        prediction.pct_error;
-
-    if (
-        percentageError !== undefined &&
-        percentageError !== null
-    ) {
-        setText(
-            [
-                "percentage-error",
-                "result-percentage-error"
-            ],
-            `${Number(percentageError).toFixed(2)}%`
-        );
-    }
-
-    displayHistoricalInformation(prediction);
-}
-
-
-// ============================================================
-// HISTORICAL INFORMATION
-// ============================================================
-
-function displayHistoricalInformation(prediction) {
-    const actualPrice =
-        prediction.actual_price ??
-        prediction.actual;
-
-    const historicalSection =
-        document.getElementById("historical-section");
-
-    if (!historicalSection) {
-        return;
-    }
-
-    if (
-        actualPrice !== undefined &&
-        actualPrice !== null &&
-        actualPrice !== ""
-    ) {
-        historicalSection.style.display = "block";
-    } else {
-        historicalSection.style.display = "none";
-    }
-}
-
-
-// ============================================================
-// MODEL SELECTOR
-// ============================================================
-
-function setupModelSelector() {
-    const selector =
-        document.getElementById("model-selector") ||
-        document.getElementById("model");
-
-    if (!selector) {
-        return;
-    }
-
-    selector.addEventListener("change", async function () {
-        const selectedModel = this.value;
-
-        if (!selectedModel) {
-            return;
-        }
-
-        window.selectedFoodPriceModel = selectedModel;
-
-        /*
-         * If the user has already made a prediction, repeat the
-         * exact same request using ONLY the newly selected model.
-         */
-        if (window.foodPriceLastRequest) {
-            const newRequest = {
-                ...window.foodPriceLastRequest,
-                model_id: selectedModel
-            };
-
-            await makePrediction(newRequest);
-        }
-    });
-}
-
-
-// ============================================================
-// POPULATE MODEL SELECTOR
-// ============================================================
-
-function populateModelSelector(prediction) {
-    const selector =
-        document.getElementById("model-selector") ||
-        document.getElementById("model");
-
-    if (!selector) {
-        return;
-    }
-
-    const selectedModel =
-        prediction?.model_id ||
-        prediction?.model ||
+    window.selectedFoodPriceModel =
         window.selectedFoodPriceModel ||
         "lstm";
 
-    window.selectedFoodPriceModel = selectedModel;
+    window.foodPricePerformance =
+        window.foodPricePerformance ||
+        [];
 
-    /*
-     * Use performance metadata only.
-     *
-     * This does NOT request or load any ML model files.
-     */
-    const performance = window.foodPricePerformance || [];
+    window.foodPriceLastRequest =
+        window.foodPriceLastRequest ||
+        null;
 
-    if (performance.length > 0) {
-        selector.innerHTML = "";
+    window.foodPriceLastResult =
+        window.foodPriceLastResult ||
+        null;
 
-        performance.forEach(model => {
-            const option = document.createElement("option");
 
-            option.value =
-                model.model_id ||
-                model.id ||
-                model.name;
+    /* =====================================================
+       APPLICATION PAGES
+       ===================================================== */
 
-            option.textContent =
-                model.display_name ||
-                formatModelName(
-                    model.model_id ||
-                    model.id ||
-                    model.name
-                );
-
-            if (option.value === selectedModel) {
-                option.selected = true;
-            }
-
-            selector.appendChild(option);
-        });
-
-        return;
-    }
-
-    // Fallback list if the performance endpoint is unavailable.
-    const models = [
-        {
-            id: "lstm",
-            name: "LSTM"
-        },
-        {
-            id: "gradient_boosting",
-            name: "Gradient Boosting"
-        },
-        {
-            id: "stacking",
-            name: "Stacking"
-        },
-        {
-            id: "linear_regression",
-            name: "Linear Regression"
-        },
-        {
-            id: "random_forest",
-            name: "Random Forest"
-        },
-        {
-            id: "neural_network",
-            name: "Neural Network"
-        },
-        {
-            id: "linear_regression_round1",
-            name: "Linear Regression (Round 1)"
-        },
-        {
-            id: "random_forest_round1",
-            name: "Random Forest (Round 1)"
-        }
+    const pageNames = [
+        "home",
+        "prediction",
+        "loading",
+        "results",
+        "unavailable",
+        "about",
+        "guide",
+        "contact"
     ];
 
-    selector.innerHTML = "";
 
-    models.forEach(model => {
-        const option = document.createElement("option");
+    function getPage(name) {
 
-        option.value = model.id;
-        option.textContent = model.name;
+        return (
+            document.getElementById(name + "-page") ||
+            document.getElementById(name)
+        );
+    }
 
-        if (model.id === selectedModel) {
-            option.selected = true;
+
+    function showPage(name) {
+
+        console.log("Showing page:", name);
+
+        pageNames.forEach(function (pageName) {
+
+            const page = getPage(pageName);
+
+            if (page) {
+                page.classList.remove("active");
+                page.classList.add("hidden");
+            }
+        });
+
+
+        const page = getPage(name);
+
+        if (page) {
+
+            page.classList.remove("hidden");
+            page.classList.add("active");
+
+        } else {
+
+            console.warn("Page not found:", name);
         }
 
-        selector.appendChild(option);
-    });
-}
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    }
 
 
-// ============================================================
-// LOAD MODEL PERFORMANCE
-// ============================================================
+    /* =====================================================
+       INITIAL PAGE
+       ===================================================== */
 
-async function loadModelPerformance() {
-    try {
-        const response = await fetch("/api/performance");
+    showPage("home");
 
-        if (!response.ok) {
-            console.warn(
-                "Model performance endpoint returned:",
-                response.status
+
+    /* =====================================================
+       START PREDICTION
+       ===================================================== */
+
+    if (startButton) {
+
+        startButton.addEventListener(
+            "click",
+            function () {
+
+                console.log("Start Prediction clicked.");
+
+                clearError();
+
+                showPage("prediction");
+            }
+        );
+    }
+
+
+    /* =====================================================
+       THREE DOT MENU
+       ===================================================== */
+
+    if (menuButton) {
+
+        menuButton.addEventListener(
+            "click",
+            function (event) {
+
+                event.stopPropagation();
+
+                if (dropdownMenu) {
+
+                    dropdownMenu.classList.toggle("hidden");
+                    dropdownMenu.classList.toggle("show");
+                }
+            }
+        );
+    }
+
+
+    document.addEventListener(
+        "click",
+        function () {
+
+            if (dropdownMenu) {
+
+                dropdownMenu.classList.remove("show");
+                dropdownMenu.classList.add("hidden");
+            }
+        }
+    );
+
+
+    if (dropdownMenu) {
+
+        dropdownMenu.addEventListener(
+            "click",
+            function (event) {
+
+                event.stopPropagation();
+            }
+        );
+    }
+
+
+    /* =====================================================
+       MENU NAVIGATION
+       ===================================================== */
+
+    document.querySelectorAll("[data-page]")
+        .forEach(function (button) {
+
+            button.addEventListener(
+                "click",
+                function () {
+
+                    const page =
+                        this.getAttribute("data-page");
+
+                    clearError();
+
+                    showPage(page);
+
+                    if (dropdownMenu) {
+
+                        dropdownMenu.classList.add("hidden");
+                        dropdownMenu.classList.remove("show");
+                    }
+                }
+            );
+        });
+
+
+    /* =====================================================
+       LOAD YEARS
+       ===================================================== */
+
+    function loadYears() {
+
+        if (!yearSelect) {
+            return;
+        }
+
+        yearSelect.innerHTML = "";
+
+        const currentYear =
+            new Date().getFullYear();
+
+
+        for (
+            let year = 2000;
+            year <= currentYear + 3;
+            year++
+        ) {
+
+            const option =
+                document.createElement("option");
+
+            option.value = year;
+            option.textContent = year;
+
+            yearSelect.appendChild(option);
+        }
+
+
+        yearSelect.value = currentYear;
+    }
+
+
+    loadYears();
+
+
+    /* =====================================================
+       LOAD COMMODITIES
+       ===================================================== */
+
+    async function loadCommodities() {
+
+        if (!commoditySelect) {
+            return;
+        }
+
+
+        try {
+
+            commoditySelect.innerHTML =
+                `<option value="">
+                    Loading commodities...
+                </option>`;
+
+
+            const response =
+                await fetch("/api/commodities");
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Could not load commodities."
+                );
+            }
+
+
+            const data =
+                await response.json();
+
+
+            commoditySelect.innerHTML =
+                `<option value="">
+                    Select a commodity
+                </option>`;
+
+
+            if (
+                !data.commodities ||
+                !Array.isArray(data.commodities)
+            ) {
+
+                throw new Error(
+                    "Invalid commodity data received."
+                );
+            }
+
+
+            data.commodities.forEach(
+                function (commodity) {
+
+                    const option =
+                        document.createElement("option");
+
+                    option.value = commodity;
+                    option.textContent = commodity;
+
+                    commoditySelect.appendChild(option);
+                }
+            );
+
+
+            console.log(
+                "Commodities loaded:",
+                data.commodities.length
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Commodity loading error:",
+                error
+            );
+
+
+            commoditySelect.innerHTML =
+                `<option value="">
+                    Failed to load commodities
+                </option>`;
+        }
+    }
+
+
+    loadCommodities();
+
+
+    /* =====================================================
+       LOAD MARKETS
+       ===================================================== */
+
+    async function loadMarkets(commodity) {
+
+        if (!marketSelect) {
+            return;
+        }
+
+
+        if (!commodity) {
+
+            marketSelect.innerHTML =
+                `<option value="">
+                    Select a commodity first
+                </option>`;
+
+            return;
+        }
+
+
+        try {
+
+            marketSelect.innerHTML =
+                `<option value="">
+                    Loading markets...
+                </option>`;
+
+
+            const url =
+                "/api/commodities/" +
+                encodeURIComponent(commodity) +
+                "/markets";
+
+
+            const response =
+                await fetch(url);
+
+
+            if (!response.ok) {
+
+                if (response.status === 404) {
+
+                    marketSelect.innerHTML =
+                        `<option value="">
+                            No markets available
+                        </option>`;
+
+                    return;
+                }
+
+
+                throw new Error(
+                    "Could not load markets."
+                );
+            }
+
+
+            const data =
+                await response.json();
+
+
+            marketSelect.innerHTML =
+                `<option value="">
+                    Select a market
+                </option>`;
+
+
+            if (
+                !data.markets ||
+                !Array.isArray(data.markets)
+            ) {
+
+                throw new Error(
+                    "Invalid market data received."
+                );
+            }
+
+
+            data.markets.forEach(
+                function (market) {
+
+                    const option =
+                        document.createElement("option");
+
+                    option.value = market;
+                    option.textContent = market;
+
+                    marketSelect.appendChild(option);
+                }
+            );
+
+
+            console.log(
+                "Markets loaded:",
+                data.markets.length
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Market loading error:",
+                error
+            );
+
+
+            marketSelect.innerHTML =
+                `<option value="">
+                    Failed to load markets
+                </option>`;
+        }
+    }
+
+
+    if (commoditySelect) {
+
+        commoditySelect.addEventListener(
+            "change",
+            function () {
+
+                clearError();
+
+                loadMarkets(
+                    commoditySelect.value
+                );
+            }
+        );
+    }
+
+
+    /* =====================================================
+       FORM VALIDATION
+       ===================================================== */
+
+    function validateForm() {
+
+        clearError();
+
+
+        if (!commoditySelect ||
+            !commoditySelect.value) {
+
+            showError(
+                "Please select a commodity."
+            );
+
+            return false;
+        }
+
+
+        if (!marketSelect ||
+            !marketSelect.value) {
+
+            showError(
+                "Please select a market."
+            );
+
+            return false;
+        }
+
+
+        if (!monthSelect ||
+            !monthSelect.value) {
+
+            showError(
+                "Please select a target month."
+            );
+
+            return false;
+        }
+
+
+        if (!yearSelect ||
+            !yearSelect.value) {
+
+            showError(
+                "Please select a target year."
+            );
+
+            return false;
+        }
+
+
+        return true;
+    }
+
+
+    function showError(message) {
+
+        console.error("Form error:", message);
+
+
+        if (formError) {
+
+            formError.textContent = message;
+            formError.classList.remove("hidden");
+        }
+    }
+
+
+    function clearError() {
+
+        if (formError) {
+
+            formError.textContent = "";
+            formError.classList.add("hidden");
+        }
+    }
+
+
+    /* =====================================================
+       PREDICT BUTTON
+       ===================================================== */
+
+    if (predictButton) {
+
+        predictButton.addEventListener(
+            "click",
+            async function () {
+
+                if (!validateForm()) {
+                    return;
+                }
+
+
+                await makePrediction();
+            }
+        );
+    }
+
+
+    /* =====================================================
+       MODEL NAMES
+       ===================================================== */
+
+    function formatModelName(modelId) {
+
+        if (!modelId) {
+            return "Unknown Model";
+        }
+
+
+        const names = {
+
+            gradient_boosting:
+                "Gradient Boosting",
+
+            stacking:
+                "Stacking",
+
+            linear_regression:
+                "Linear Regression",
+
+            random_forest:
+                "Random Forest",
+
+            lstm:
+                "LSTM",
+
+            neural_network:
+                "Neural Network",
+
+            linear_regression_round1:
+                "Linear Regression (Round 1)",
+
+            random_forest_round1:
+                "Random Forest (Round 1)"
+        };
+
+
+        if (names[modelId]) {
+            return names[modelId];
+        }
+
+
+        return String(modelId)
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, function (letter) {
+                return letter.toUpperCase();
+            });
+    }
+
+
+    /* =====================================================
+       AVAILABLE MODELS
+       ===================================================== */
+
+    const fallbackModels = [
+        "lstm",
+        "gradient_boosting",
+        "stacking",
+        "linear_regression",
+        "random_forest",
+        "neural_network",
+        "linear_regression_round1",
+        "random_forest_round1"
+    ];
+
+
+    function getAvailableModelOptions() {
+
+        if (
+            Array.isArray(window.foodPricePerformance) &&
+            window.foodPricePerformance.length > 0
+        ) {
+
+            const models =
+                window.foodPricePerformance
+                    .map(function (item) {
+
+                        if (typeof item === "string") {
+                            return item;
+                        }
+
+                        return item.model_id;
+                    })
+                    .filter(Boolean);
+
+
+            if (models.length > 0) {
+                return models;
+            }
+        }
+
+
+        return fallbackModels;
+    }
+
+
+    /* =====================================================
+       POPULATE MODEL SELECTOR
+       ===================================================== */
+
+    function populateModelSelector() {
+
+        if (!modelSelect) {
+            return;
+        }
+
+
+        const models =
+            getAvailableModelOptions();
+
+
+        modelSelect.innerHTML = "";
+
+
+        models.forEach(
+            function (modelId) {
+
+                const option =
+                    document.createElement("option");
+
+                option.value = modelId;
+
+                option.textContent =
+                    formatModelName(modelId);
+
+                modelSelect.appendChild(option);
+            }
+        );
+
+
+        if (
+            models.includes(
+                window.selectedFoodPriceModel
+            )
+        ) {
+
+            modelSelect.value =
+                window.selectedFoodPriceModel;
+
+        } else {
+
+            window.selectedFoodPriceModel =
+                models[0] || "lstm";
+
+            modelSelect.value =
+                window.selectedFoodPriceModel;
+        }
+    }
+
+
+    /* =====================================================
+       MODEL SELECTOR CHANGE
+       ===================================================== */
+
+    if (modelSelect) {
+
+        modelSelect.addEventListener(
+            "change",
+            async function () {
+
+                const selectedModel =
+                    modelSelect.value;
+
+
+                if (!selectedModel) {
+                    return;
+                }
+
+
+                window.selectedFoodPriceModel =
+                    selectedModel;
+
+
+                console.log(
+                    "Selected model:",
+                    selectedModel
+                );
+
+
+                /*
+                 * If we already have a prediction request,
+                 * run the SAME request again using ONLY
+                 * the newly selected model.
+                 */
+
+                if (window.foodPriceLastRequest) {
+
+                    await makePrediction(
+                        window.foodPriceLastRequest,
+                        selectedModel
+                    );
+                }
+            }
+        );
+    }
+
+
+    /* =====================================================
+       MAKE PREDICTION
+       ===================================================== */
+
+    async function makePrediction(
+        savedRequest = null,
+        selectedModel = null
+    ) {
+
+        clearError();
+
+
+        let request;
+
+
+        if (savedRequest) {
+
+            request = {
+                ...savedRequest
+            };
+
+        } else {
+
+            request = {
+
+                commodity:
+                    commoditySelect.value,
+
+                market:
+                    marketSelect.value,
+
+                target_month:
+                    Number(monthSelect.value),
+
+                target_year:
+                    Number(yearSelect.value)
+            };
+        }
+
+
+        const modelId =
+            selectedModel ||
+            window.selectedFoodPriceModel ||
+            "lstm";
+
+
+        request.model_id = modelId;
+
+
+        window.foodPriceLastRequest = {
+            commodity: request.commodity,
+            market: request.market,
+            target_month: request.target_month,
+            target_year: request.target_year
+        };
+
+
+        window.selectedFoodPriceModel =
+            modelId;
+
+
+        console.log(
+            "Prediction request:",
+            request
+        );
+
+
+        showPage("loading");
+
+
+        try {
+
+            /*
+             * IMPORTANT:
+             *
+             * We intentionally call /api/predict
+             * instead of /api/predict/all.
+             *
+             * This sends only ONE model request,
+             * which is required for the Render
+             * 512 MB memory limit.
+             */
+
+            const response =
+                await fetch(
+                    "/api/predict",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify(request)
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                let errorMessage =
+                    "Prediction failed.";
+
+                try {
+
+                    const errorData =
+                        await response.json();
+
+                    if (errorData.detail) {
+                        errorMessage =
+                            errorData.detail;
+                    }
+
+                } catch (e) {
+                    console.warn(
+                        "Could not parse error response."
+                    );
+                }
+
+
+                throw new Error(
+                    errorMessage
+                );
+            }
+
+
+            const rawData =
+                await response.json();
+
+
+            console.log(
+                "Prediction response:",
+                rawData
+            );
+
+
+            /*
+             * The backend now returns ONE result.
+             *
+             * The existing results UI expects
+             * an array, so wrap the single response.
+             */
+
+            const predictions = [
+                rawData
+            ];
+
+
+            window.foodPriceLastResult =
+                rawData;
+
+
+            /*
+             * Keep the loading screen visible
+             * for at least five seconds so the
+             * AI loading animation is shown.
+             */
+
+            await keepLoadingForFiveSeconds();
+
+
+            displayResults(
+                predictions,
+                rawData
+            );
+
+
+            showPage("results");
+
+
+        } catch (error) {
+
+            console.error(
+                "Prediction error:",
+                error
+            );
+
+
+            await keepLoadingForFiveSeconds();
+
+
+            showUnavailablePage(
+                error.message ||
+                "The prediction could not be completed."
+            );
+        }
+    }
+
+
+    /* =====================================================
+       FIVE SECOND LOADING
+       ===================================================== */
+
+    async function keepLoadingForFiveSeconds() {
+
+        await wait(5000);
+    }
+
+
+    /* =====================================================
+       UNAVAILABLE PAGE
+       ===================================================== */
+
+    function showUnavailablePage(
+        message
+    ) {
+
+        const unavailablePage =
+            document.getElementById(
+                "unavailable-page"
+            );
+
+
+        if (unavailablePage) {
+
+            const messageElements =
+                unavailablePage.querySelectorAll(
+                    "[data-error-message]"
+                );
+
+
+            messageElements.forEach(
+                function (element) {
+
+                    element.textContent =
+                        message;
+                }
+            );
+        }
+
+
+        showPage("unavailable");
+    }
+
+
+    /* =====================================================
+       DISPLAY RESULTS
+       ===================================================== */
+
+    function displayResults(
+        results,
+        rawData = null
+    ) {
+
+        if (
+            !Array.isArray(results) ||
+            results.length === 0
+        ) {
+
+            showUnavailablePage(
+                "No prediction result was returned."
             );
 
             return;
         }
 
-        const data = await response.json();
-
-        /*
-         * Store performance metadata only.
-         * This endpoint should not load the actual model files.
-         */
-        if (Array.isArray(data)) {
-            window.foodPricePerformance = data;
-        } else if (Array.isArray(data.models)) {
-            window.foodPricePerformance = data.models;
-        } else if (Array.isArray(data.performance)) {
-            window.foodPricePerformance = data.performance;
-        } else {
-            window.foodPricePerformance = [];
-        }
 
         console.log(
-            "Loaded model performance metadata:",
-            window.foodPricePerformance
+            "Displaying results:",
+            results
         );
 
-    } catch (error) {
-        console.warn(
-            "Could not load model performance:",
-            error
-        );
-    }
-}
+
+        /*
+         * Because we now request only one model,
+         * results contains one result.
+         */
+
+        const selectedId =
+            window.selectedFoodPriceModel;
 
 
-// ============================================================
-// UNAVAILABLE PAGE
-// ============================================================
+        let selectedResult =
+            results.find(
+                function (item) {
 
-function showUnavailable(message) {
-    const unavailablePage =
-        document.getElementById("unavailable-page");
+                    return (
+                        item.model_id ===
+                        selectedId
+                    );
+                }
+            );
 
-    if (unavailablePage) {
-        unavailablePage.classList.add("active");
-    }
 
-    const pages = document.querySelectorAll(".page");
+        if (!selectedResult) {
 
-    pages.forEach(page => {
-        if (page.id !== "unavailable-page") {
-            page.classList.remove("active");
+            selectedResult =
+                results[0];
         }
-    });
-
-    setText(
-        [
-            "unavailable-message",
-            "error-message"
-        ],
-        message ||
-        "This prediction is currently unavailable."
-    );
-
-    window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-    });
-}
 
 
-// ============================================================
-// HELPER FUNCTIONS
-// ============================================================
+        window.foodPriceLastResult =
+            selectedResult;
 
-function setText(elementIds, value) {
-    const ids = Array.isArray(elementIds)
-        ? elementIds
-        : [elementIds];
 
-    for (const id of ids) {
-        const element = document.getElementById(id);
+        /*
+         * Make sure the model selector reflects
+         * the currently selected model.
+         */
 
-        if (element) {
-            element.textContent =
-                value !== undefined &&
-                value !== null
-                    ? value
-                    : "";
+        if (modelSelect) {
 
+            populateModelSelector();
+
+            if (
+                selectedResult.model_id
+            ) {
+
+                modelSelect.value =
+                    selectedResult.model_id;
+
+                window.selectedFoodPriceModel =
+                    selectedResult.model_id;
+            }
+        }
+
+
+        renderSelectedResult();
+
+
+        /*
+         * Render model cards.
+         *
+         * Since the new low-memory architecture
+         * returns one model at a time, this grid
+         * contains only the model that was actually
+         * loaded.
+         */
+
+        renderAllModels(results);
+    }
+
+
+    /* =====================================================
+       RENDER SELECTED RESULT
+       ===================================================== */
+
+    function renderSelectedResult() {
+
+        const result =
+            window.foodPriceLastResult;
+
+
+        if (!result) {
             return;
         }
+
+
+        console.log(
+            "Rendering selected result:",
+            result
+        );
+
+
+        /* -----------------------------------------
+           TITLE
+           ----------------------------------------- */
+
+        setText(
+            "result-title",
+            "Prediction Result"
+        );
+
+
+        setText(
+            "result-subtitle",
+            (
+                result.commodity ||
+                window.foodPriceLastRequest?.commodity ||
+                "Commodity"
+            ) +
+            " - " +
+            (
+                result.market ||
+                window.foodPriceLastRequest?.market ||
+                "Market"
+            )
+        );
+
+
+        /* -----------------------------------------
+           MAIN PREDICTION
+           ----------------------------------------- */
+
+        if (
+            result.prediction !== null &&
+            result.prediction !== undefined
+        ) {
+
+            setText(
+                "main-prediction",
+                formatNumber(
+                    result.prediction
+                )
+            );
+
+
+            setText(
+                "prediction-unit",
+                result.unit ||
+                "ETB/KG"
+            );
+
+
+        } else {
+
+            setText(
+                "main-prediction",
+                "--"
+            );
+
+
+            setText(
+                "prediction-unit",
+                result.unit ||
+                "ETB/KG"
+            );
+        }
+
+
+        /* -----------------------------------------
+           PREDICTION STATUS
+           ----------------------------------------- */
+
+        let status =
+            result.actual_available
+                ? "Historical prediction"
+                : "Future prediction";
+
+
+        if (
+            result.target_year &&
+            Number(result.target_year) >
+                new Date().getFullYear()
+        ) {
+
+            status =
+                "Future prediction";
+        }
+
+
+        setText(
+            "prediction-status",
+            status
+        );
+
+
+        /* -----------------------------------------
+           DETAILS
+           ----------------------------------------- */
+
+        setText(
+            "detail-commodity",
+            result.commodity ||
+            window.foodPriceLastRequest?.commodity ||
+            "--"
+        );
+
+
+        setText(
+            "detail-market",
+            result.market ||
+            window.foodPriceLastRequest?.market ||
+            "--"
+        );
+
+
+        setText(
+            "detail-model",
+            result.model_name ||
+            formatModelName(
+                result.model_id ||
+                window.selectedFoodPriceModel
+            )
+        );
+
+
+        if (
+            result.target_date
+        ) {
+
+            setText(
+                "detail-target-date",
+                formatDate(
+                    result.target_date
+                )
+            );
+
+        } else if (
+            result.target_year &&
+            result.target_month
+        ) {
+
+            setText(
+                "detail-target-date",
+                getMonthName(
+                    result.target_month
+                ) +
+                " " +
+                result.target_year
+            );
+
+        } else {
+
+            setText(
+                "detail-target-date",
+                "--"
+            );
+        }
+
+
+        setText(
+            "detail-source-date",
+            result.source_date
+                ? formatDate(
+                    result.source_date
+                )
+                : "--"
+        );
+
+
+        /* -----------------------------------------
+           ERROR INFORMATION
+           ----------------------------------------- */
+
+        if (
+            result.absolute_error !== null &&
+            result.absolute_error !== undefined
+        ) {
+
+            setText(
+                "absolute-error",
+                formatNumber(
+                    result.absolute_error
+                ) +
+                " " +
+                (
+                    result.unit ||
+                    "ETB/KG"
+                )
+            );
+
+        } else {
+
+            setText(
+                "absolute-error",
+                "--"
+            );
+        }
+
+
+        if (
+            result.percentage_error !== null &&
+            result.percentage_error !== undefined
+        ) {
+
+            setText(
+                "percentage-error",
+                formatNumber(
+                    result.percentage_error
+                ) +
+                "%"
+            );
+
+        } else {
+
+            setText(
+                "percentage-error",
+                "N/A"
+            );
+        }
+
+
+        /* -----------------------------------------
+           MODEL PERFORMANCE
+           ----------------------------------------- */
+
+        let performance =
+            result.performance;
+
+
+        if (
+            !performance &&
+            Array.isArray(
+                window.foodPricePerformance
+            )
+        ) {
+
+            performance =
+                window.foodPricePerformance.find(
+                    function (item) {
+
+                        return (
+                            item.model_id ===
+                            result.model_id
+                        );
+                    }
+                );
+        }
+
+
+        if (performance) {
+
+            if (
+                performance.mae !== null &&
+                performance.mae !== undefined
+            ) {
+
+                setText(
+                    "metric-mae",
+                    Number(
+                        performance.mae
+                    ).toFixed(3)
+                );
+            }
+
+
+            if (
+                performance.mse !== null &&
+                performance.mse !== undefined
+            ) {
+
+                setText(
+                    "metric-mse",
+                    Number(
+                        performance.mse
+                    ).toFixed(3)
+                );
+            }
+
+
+            if (
+                performance.rmse !== null &&
+                performance.rmse !== undefined
+            ) {
+
+                setText(
+                    "metric-rmse",
+                    Number(
+                        performance.rmse
+                    ).toFixed(3)
+                );
+            }
+
+
+            if (
+                performance.r2 !== null &&
+                performance.r2 !== undefined
+            ) {
+
+                setText(
+                    "metric-r2",
+                    Number(
+                        performance.r2
+                    ).toFixed(3)
+                );
+            }
+        }
+
+
+        /* -----------------------------------------
+           ACTUAL VS PREDICTED
+           ----------------------------------------- */
+
+        const comparison =
+            document.getElementById(
+                "actual-predicted-section"
+            );
+
+
+        if (
+            comparison &&
+            result.actual_available &&
+            result.actual_price !== null &&
+            result.prediction !== null
+        ) {
+
+            comparison.classList.remove(
+                "hidden"
+            );
+
+
+            const actual =
+                Number(
+                    result.actual_price
+                );
+
+
+            const prediction =
+                Number(
+                    result.prediction
+                );
+
+
+            const maximum =
+                Math.max(
+                    actual,
+                    prediction,
+                    1
+                );
+
+
+            const actualBar =
+                document.getElementById(
+                    "actual-bar"
+                );
+
+
+            const predictedBar =
+                document.getElementById(
+                    "predicted-bar"
+                );
+
+
+            if (actualBar) {
+
+                actualBar.style.width =
+                    (
+                        actual /
+                        maximum *
+                        100
+                    ) +
+                    "%";
+            }
+
+
+            if (predictedBar) {
+
+                predictedBar.style.width =
+                    (
+                        prediction /
+                        maximum *
+                        100
+                    ) +
+                    "%";
+            }
+
+
+            setText(
+                "visual-actual",
+                formatNumber(
+                    actual
+                ) +
+                " " +
+                (
+                    result.unit ||
+                    "ETB/KG"
+                )
+            );
+
+
+            setText(
+                "visual-predicted",
+                formatNumber(
+                    prediction
+                ) +
+                " " +
+                (
+                    result.unit ||
+                    "ETB/KG"
+                )
+            );
+
+
+        } else if (comparison) {
+
+            comparison.classList.add(
+                "hidden"
+            );
+        }
     }
-}
 
 
-function formatPrice(value) {
-    const number = Number(value);
+    /* =====================================================
+       RENDER MODEL CARDS
+       ===================================================== */
 
-    if (!Number.isFinite(number)) {
-        return value;
-    }
-
-    return `${number.toFixed(2)} ETB/KG`;
-}
-
-
-function formatMonth(month) {
-    const monthNumber = Number(month);
-
-    if (
-        !Number.isInteger(monthNumber) ||
-        monthNumber < 1 ||
-        monthNumber > 12
+    function renderAllModels(
+        results
     ) {
-        return month;
+
+        const grid =
+            document.getElementById(
+                "models-grid"
+            );
+
+
+        if (!grid) {
+            return;
+        }
+
+
+        grid.innerHTML = "";
+
+
+        if (
+            !Array.isArray(results)
+        ) {
+            return;
+        }
+
+
+        results.forEach(
+            function (result) {
+
+                if (
+                    result.prediction === null ||
+                    result.prediction === undefined
+                ) {
+
+                    return;
+                }
+
+
+                const card =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                card.className =
+                    "model-card";
+
+
+                if (
+                    result.model_id ===
+                    window.selectedFoodPriceModel
+                ) {
+
+                    card.classList.add(
+                        "selected"
+                    );
+                }
+
+
+                const error =
+                    result.percentage_error !== null &&
+                    result.percentage_error !== undefined
+
+                        ? formatNumber(
+                            result.percentage_error
+                        ) + "%"
+
+                        : "N/A";
+
+
+                card.innerHTML = `
+
+                    <h3>
+                        ${escapeHtml(
+                            result.model_name ||
+                            formatModelName(
+                                result.model_id
+                            )
+                        )}
+                    </h3>
+
+                    <div class="model-prediction">
+                        ${formatNumber(
+                            result.prediction
+                        )}
+                        ${
+                            result.unit ||
+                            "ETB/KG"
+                        }
+                    </div>
+
+                    <p>
+                        Error:
+                        <strong>
+                            ${error}
+                        </strong>
+                    </p>
+
+                `;
+
+
+                card.addEventListener(
+                    "click",
+                    async function () {
+
+                        window.selectedFoodPriceModel =
+                            result.model_id;
+
+
+                        if (modelSelect) {
+
+                            modelSelect.value =
+                                result.model_id;
+                        }
+
+
+                        /*
+                         * Run the selected model only.
+                         */
+
+                        if (
+                            window.foodPriceLastRequest
+                        ) {
+
+                            await makePrediction(
+                                window.foodPriceLastRequest,
+                                result.model_id
+                            );
+                        }
+                    }
+                );
+
+
+                grid.appendChild(card);
+            }
+        );
     }
 
-    const months = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December"
-    ];
 
-    return months[monthNumber - 1];
-}
+    /* =====================================================
+       NEW PREDICTION
+       ===================================================== */
 
+    if (newPredictionButton) {
 
-function formatModelName(modelId) {
-    if (!modelId) {
-        return "Unknown Model";
+        newPredictionButton.addEventListener(
+            "click",
+            function () {
+
+                clearError();
+
+                showPage(
+                    "prediction"
+                );
+            }
+        );
     }
 
-    const names = {
-        "gradient_boosting": "Gradient Boosting",
-        "stacking": "Stacking",
-        "linear_regression": "Linear Regression",
-        "random_forest": "Random Forest",
-        "lstm": "LSTM",
-        "neural_network": "Neural Network",
-        "linear_regression_round1":
-            "Linear Regression (Round 1)",
-        "random_forest_round1":
-            "Random Forest (Round 1)"
-    };
 
-    if (names[modelId]) {
-        return names[modelId];
+    /* =====================================================
+       RETURN TO PREDICTION
+       ===================================================== */
+
+    if (returnToPredictionButton) {
+
+        returnToPredictionButton.addEventListener(
+            "click",
+            function () {
+
+                clearError();
+
+                showPage(
+                    "prediction"
+                );
+            }
+        );
     }
 
-    return modelId
-        .replaceAll("_", " ")
-        .replace(/\b\w/g, letter => letter.toUpperCase());
-}
+
+    /* =====================================================
+       HELPERS
+       ===================================================== */
+
+    function setText(
+        id,
+        value
+    ) {
+
+        const element =
+            document.getElementById(id);
 
 
-// ============================================================
-// BACK TO HOME
-// ============================================================
+        if (element) {
 
-document.addEventListener("click", event => {
-    const button = event.target.closest(
-        "#back-home, .back-home, [data-action='home']"
+            element.textContent =
+                value;
+        }
+    }
+
+
+    function formatNumber(
+        value
+    ) {
+
+        if (
+            value === null ||
+            value === undefined ||
+            Number.isNaN(
+                Number(value)
+            )
+        ) {
+
+            return "--";
+        }
+
+
+        return Number(value)
+            .toLocaleString(
+                undefined,
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+            );
+    }
+
+
+    function formatDate(
+        value
+    ) {
+
+        if (!value) {
+            return "--";
+        }
+
+
+        const date =
+            new Date(value);
+
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+
+            return value;
+        }
+
+
+        return date.toLocaleDateString(
+            undefined,
+            {
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+            }
+        );
+    }
+
+
+    function getMonthName(
+        monthNumber
+    ) {
+
+        const months = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December"
+        ];
+
+
+        return (
+            months[
+                Number(monthNumber) - 1
+            ] ||
+            "Selected month"
+        );
+    }
+
+
+    function escapeHtml(
+        value
+    ) {
+
+        return String(value)
+            .replace(
+                /&/g,
+                "&amp;"
+            )
+            .replace(
+                /</g,
+                "&lt;"
+            )
+            .replace(
+                />/g,
+                "&gt;"
+            )
+            .replace(
+                /"/g,
+                "&quot;"
+            )
+            .replace(
+                /'/g,
+                "&#039;"
+            );
+    }
+
+
+    function wait(
+        milliseconds
+    ) {
+
+        return new Promise(
+            function (resolve) {
+
+                setTimeout(
+                    resolve,
+                    milliseconds
+                );
+            }
+        );
+    }
+
+
+    /* =====================================================
+       LOAD MODEL PERFORMANCE
+       ===================================================== */
+
+    async function loadPerformance() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/models"
+                );
+
+
+            if (!response.ok) {
+
+                console.warn(
+                    "Could not load model performance."
+                );
+
+                populateModelSelector();
+
+                return;
+            }
+
+
+            const data =
+                await response.json();
+
+
+            window.foodPricePerformance =
+                data.models || [];
+
+
+            console.log(
+                "Model performance loaded:",
+                window.foodPricePerformance.length
+            );
+
+
+            populateModelSelector();
+
+
+        } catch (error) {
+
+            console.error(
+                "Performance loading error:",
+                error
+            );
+
+
+            window.foodPricePerformance =
+                [];
+
+
+            populateModelSelector();
+        }
+    }
+
+
+    /* =====================================================
+       INITIALIZE
+       ===================================================== */
+
+    populateModelSelector();
+
+    loadPerformance();
+
+
+    console.log(
+        "Food Price AI initialization complete."
     );
 
-    if (!button) {
-        return;
-    }
-
-    event.preventDefault();
-
-    showPage("home");
 });
-
-
-// ============================================================
-// DEBUGGING
-// ============================================================
-
-console.log(
-    "Food Price AI frontend loaded."
-);
-
-console.log(
-    "Single-model prediction endpoint: /api/predict"
-);
