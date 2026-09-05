@@ -1,2219 +1,857 @@
-console.log("Food Price AI JavaScript file loaded.");
+// Food Price AI - Frontend JavaScript
+
+document.addEventListener("DOMContentLoaded", () => {
+    initializeApp();
+});
 
 
-document.addEventListener("DOMContentLoaded", function () {
+// ============================================================
+// GLOBAL STATE
+// ============================================================
 
-    console.log("Food Price AI JavaScript initialized.");
-
-
-    /* =====================================================
-       ELEMENTS
-       ===================================================== */
-
-    const startButton =
-        document.getElementById("start-prediction-button");
-
-    const predictButton =
-        document.getElementById("predict-button");
-
-    const newPredictionButton =
-        document.getElementById("new-prediction-button");
-
-    const menuButton =
-        document.getElementById("menu-button");
-
-    const dropdownMenu =
-        document.getElementById("dropdown-menu");
-
-    const commoditySelect =
-        document.getElementById("commodity");
-
-    const marketSelect =
-        document.getElementById("market");
-
-    const monthSelect =
-        document.getElementById("target-month");
-
-    const yearSelect =
-        document.getElementById("target-year");
-
-    const formError =
-        document.getElementById("form-error");
-
-    const modelSelect =
-        document.getElementById("result-model-select");
+window.foodPriceLastRequest = null;
+window.foodPricePerformance = [];
+window.selectedFoodPriceModel = "lstm";
 
 
-    console.log("Start button:", startButton);
-    console.log("Predict button:", predictButton);
-    console.log("Commodity:", commoditySelect);
-    console.log("Market:", marketSelect);
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
+async function initializeApp() {
+    setupNavigation();
+    setupPredictionForm();
+    setupModelSelector();
+    setupMenu();
+
+    // Load lightweight model performance information.
+    // This does NOT load the actual ML model files.
+    await loadModelPerformance();
+}
 
 
-    /* =====================================================
-       APPLICATION PAGES
-       ===================================================== */
+// ============================================================
+// NAVIGATION
+// ============================================================
 
-    const pageNames = [
-        "home",
-        "prediction",
-        "loading",
-        "results",
-        "unavailable",
-        "about",
-        "guide",
-        "contact"
-    ];
-
-
-    function getPage(name) {
-
-        return (
-            document.getElementById(name + "-page") ||
-            document.getElementById(name)
-        );
-    }
-
-
-    function showPage(name) {
-
-        console.log("Showing page:", name);
-
-
-        pageNames.forEach(function (pageName) {
-
-            const page = getPage(pageName);
-
-
-            if (page) {
-
-                page.classList.remove("active");
-                page.classList.add("hidden");
-            }
+function setupNavigation() {
+    const homeButtons = document.querySelectorAll("[data-page='home']");
+    
+    homeButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            showPage("home");
         });
-
-
-        const page = getPage(name);
-
-
-        if (page) {
-
-            page.classList.remove("hidden");
-            page.classList.add("active");
-
-        } else {
-
-            console.warn(
-                "Page not found:",
-                name
-            );
-        }
-
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-    }
-
-
-    /* =====================================================
-       HOME PAGE
-       ===================================================== */
-
-    showPage("home");
-
-
-    /* =====================================================
-       START PREDICTION
-       ===================================================== */
-
-    if (startButton) {
-
-        startButton.addEventListener(
-            "click",
-            function () {
-
-                console.log(
-                    "Start Prediction clicked."
-                );
-
-                clearError();
-
-                showPage("prediction");
-            }
-        );
-
-    } else {
-
-        console.error(
-            "Start Prediction button not found."
-        );
-    }
-
-
-    /* =====================================================
-       THREE DOT MENU
-       ===================================================== */
-
-    if (menuButton) {
-
-        menuButton.addEventListener(
-            "click",
-            function (event) {
-
-                event.stopPropagation();
-
-
-                console.log(
-                    "Menu button clicked."
-                );
-
-
-                if (dropdownMenu) {
-
-                    dropdownMenu.classList.toggle(
-                        "hidden"
-                    );
-
-                    dropdownMenu.classList.toggle(
-                        "show"
-                    );
-                }
-            }
-        );
-    }
-
-
-    document.addEventListener(
-        "click",
-        function () {
-
-            if (dropdownMenu) {
-
-                dropdownMenu.classList.remove(
-                    "show"
-                );
-
-                dropdownMenu.classList.add(
-                    "hidden"
-                );
-            }
-        }
-    );
-
-
-    if (dropdownMenu) {
-
-        dropdownMenu.addEventListener(
-            "click",
-            function (event) {
-
-                event.stopPropagation();
-            }
-        );
-    }
-
-
-    /* =====================================================
-       MENU NAVIGATION
-       ===================================================== */
-
-    document.querySelectorAll(
-        "[data-page]"
-    ).forEach(function (button) {
-
-        button.addEventListener(
-            "click",
-            function () {
-
-                const page =
-                    this.getAttribute(
-                        "data-page"
-                    );
-
-
-                console.log(
-                    "Navigation clicked:",
-                    page
-                );
-
-
-                clearError();
-
-                showPage(page);
-
-
-                if (dropdownMenu) {
-
-                    dropdownMenu.classList.add(
-                        "hidden"
-                    );
-
-                    dropdownMenu.classList.remove(
-                        "show"
-                    );
-                }
-            }
-        );
     });
 
+    const aboutButtons = document.querySelectorAll("[data-page='about']");
+    
+    aboutButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            showPage("about");
+        });
+    });
 
-    /* =====================================================
-       LOAD YEARS
-       ===================================================== */
+    const contactButtons = document.querySelectorAll("[data-page='contact']");
+    
+    contactButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            showPage("contact");
+        });
+    });
 
-    function loadYears() {
-
-        if (!yearSelect) {
-            return;
-        }
-
-
-        yearSelect.innerHTML = "";
-
-
-        const currentYear =
-            new Date().getFullYear();
-
-
-        for (
-            let year = 2000;
-            year <= currentYear + 3;
-            year++
-        ) {
-
-            const option =
-                document.createElement(
-                    "option"
-                );
+    const guideButtons = document.querySelectorAll("[data-page='guide']");
+    
+    guideButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            showPage("guide");
+        });
+    });
+}
 
 
-            option.value = year;
+function showPage(pageName) {
+    const pages = document.querySelectorAll(".page");
 
-            option.textContent = year;
+    pages.forEach(page => {
+        page.classList.remove("active");
+    });
 
+    const targetPage = document.getElementById(`${pageName}-page`);
 
-            yearSelect.appendChild(
-                option
-            );
-        }
-
-
-        yearSelect.value =
-            currentYear;
+    if (targetPage) {
+        targetPage.classList.add("active");
     }
 
-
-    loadYears();
-
-
-    /* =====================================================
-       LOAD COMMODITIES
-       ===================================================== */
-
-    async function loadCommodities() {
-
-        if (!commoditySelect) {
-            return;
-        }
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
 
 
-        try {
+// ============================================================
+// THREE-DOT MENU
+// ============================================================
 
-            commoditySelect.innerHTML =
-                `<option value="">
-                    Loading commodities...
-                </option>`;
+function setupMenu() {
+    const menuButton = document.querySelector(".menu-button");
+    const menu = document.querySelector(".dropdown-menu");
 
-
-            const response =
-                await fetch(
-                    "/api/commodities"
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "Could not load commodities."
-                );
-            }
-
-
-            const data =
-                await response.json();
-
-
-            commoditySelect.innerHTML =
-                `<option value="">
-                    Select a commodity
-                </option>`;
-
-
-            if (
-                !data.commodities ||
-                !Array.isArray(
-                    data.commodities
-                )
-            ) {
-
-                throw new Error(
-                    "Invalid commodity data received."
-                );
-            }
-
-
-            data.commodities.forEach(
-                function (commodity) {
-
-                    const option =
-                        document.createElement(
-                            "option"
-                        );
-
-
-                    option.value =
-                        commodity;
-
-                    option.textContent =
-                        commodity;
-
-
-                    commoditySelect.appendChild(
-                        option
-                    );
-                }
-            );
-
-
-            console.log(
-                "Commodities loaded:",
-                data.commodities.length
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                "Commodity loading error:",
-                error
-            );
-
-
-            commoditySelect.innerHTML =
-                `<option value="">
-                    Failed to load commodities
-                </option>`;
-        }
+    if (!menuButton || !menu) {
+        return;
     }
 
+    menuButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        menu.classList.toggle("show");
+    });
 
-    loadCommodities();
+    document.addEventListener("click", () => {
+        menu.classList.remove("show");
+    });
 
-
-    /* =====================================================
-       LOAD MARKETS
-       ===================================================== */
-
-    async function loadMarkets(
-        commodity
-    ) {
-
-        if (!marketSelect) {
-            return;
-        }
+    menu.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
+}
 
 
-        if (!commodity) {
+// ============================================================
+// PREDICTION FORM
+// ============================================================
 
-            marketSelect.innerHTML =
-                `<option value="">
-                    Select a commodity first
-                </option>`;
+function setupPredictionForm() {
+    const form = document.getElementById("prediction-form");
 
-            return;
-        }
-
-
-        try {
-
-            marketSelect.innerHTML =
-                `<option value="">
-                    Loading markets...
-                </option>`;
-
-
-            const url =
-                "/api/commodities/" +
-                encodeURIComponent(
-                    commodity
-                ) +
-                "/markets";
-
-
-            const response =
-                await fetch(url);
-
-
-            if (!response.ok) {
-
-                /*
-                   The commodity exists, but there
-                   are no supported markets.
-                */
-
-                if (
-                    response.status === 404
-                ) {
-
-                    marketSelect.innerHTML =
-                        `<option value="">
-                            No markets available
-                        </option>`;
-
-                    return;
-                }
-
-
-                throw new Error(
-                    "Could not load markets."
-                );
-            }
-
-
-            const data =
-                await response.json();
-
-
-            marketSelect.innerHTML =
-                `<option value="">
-                    Select a market
-                </option>`;
-
-
-            if (
-                !data.markets ||
-                !Array.isArray(
-                    data.markets
-                )
-            ) {
-
-                throw new Error(
-                    "Invalid market data received."
-                );
-            }
-
-
-            data.markets.forEach(
-                function (market) {
-
-                    const option =
-                        document.createElement(
-                            "option"
-                        );
-
-
-                    option.value =
-                        market;
-
-                    option.textContent =
-                        market;
-
-
-                    marketSelect.appendChild(
-                        option
-                    );
-                }
-            );
-
-
-            console.log(
-                "Markets loaded:",
-                data.markets.length
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                "Market loading error:",
-                error
-            );
-
-
-            marketSelect.innerHTML =
-                `<option value="">
-                    Failed to load markets
-                </option>`;
-        }
+    if (!form) {
+        return;
     }
 
-
-    if (commoditySelect) {
-
-        commoditySelect.addEventListener(
-            "change",
-            function () {
-
-                console.log(
-                    "Commodity selected:",
-                    this.value
-                );
-
-
-                clearError();
-
-                loadMarkets(
-                    this.value
-                );
-            }
-        );
-    }
-
-
-    /* =====================================================
-       FORM ERROR
-       ===================================================== */
-
-    function showError(message) {
-
-        if (formError) {
-
-            formError.textContent =
-                message;
-
-            formError.classList.remove(
-                "hidden"
-            );
-        }
-
-
-        console.error(message);
-    }
-
-
-    function clearError() {
-
-        if (formError) {
-
-            formError.textContent = "";
-
-            formError.classList.add(
-                "hidden"
-            );
-        }
-    }
-
-
-    /* =====================================================
-       PREDICT BUTTON
-       ===================================================== */
-
-    if (predictButton) {
-
-        predictButton.addEventListener(
-            "click",
-            async function () {
-
-                console.log(
-                    "Predict button clicked."
-                );
-
-
-                clearError();
-
-
-                /* -----------------------------------------
-                   VALIDATE COMMODITY
-                   ----------------------------------------- */
-
-                if (
-                    !commoditySelect ||
-                    !commoditySelect.value
-                ) {
-
-                    showError(
-                        "Please select a commodity."
-                    );
-
-                    return;
-                }
-
-
-                /* -----------------------------------------
-                   VALIDATE MARKET
-                   ----------------------------------------- */
-
-                if (
-                    !marketSelect ||
-                    !marketSelect.value
-                ) {
-
-                    showError(
-                        "Please select a market."
-                    );
-
-                    return;
-                }
-
-
-                /* -----------------------------------------
-                   VALIDATE MONTH
-                   ----------------------------------------- */
-
-                if (
-                    !monthSelect ||
-                    !monthSelect.value
-                ) {
-
-                    showError(
-                        "Please select a target month."
-                    );
-
-                    return;
-                }
-
-
-                /* -----------------------------------------
-                   VALIDATE YEAR
-                   ----------------------------------------- */
-
-                if (
-                    !yearSelect ||
-                    !yearSelect.value
-                ) {
-
-                    showError(
-                        "Please select a target year."
-                    );
-
-                    return;
-                }
-
-
-                const request = {
-
-                    commodity:
-                        commoditySelect.value,
-
-                    market:
-                        marketSelect.value,
-
-                    target_month:
-                        Number(
-                            monthSelect.value
-                        ),
-
-                    target_year:
-                        Number(
-                            yearSelect.value
-                        )
-                };
-
-
-                console.log(
-                    "Prediction request:",
-                    request
-                );
-
-
-                await makePrediction(
-                    request
-                );
-            }
-        );
-
-
-    } else {
-
-        console.error(
-            "Predict button not found."
-        );
-    }
-
-
-    /* =====================================================
-       MAKE PREDICTION
-       ===================================================== */
-
-    async function makePrediction(
-        request
-    ) {
-
-        showPage("loading");
-
-
-        const startTime =
-            Date.now();
-
-
-        try {
-
-            const response =
-                await fetch(
-                    "/api/predict/all",
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body:
-                            JSON.stringify(
-                                request
-                            )
-                    }
-                );
-
-
-            /* -----------------------------------------
-               API ERROR
-               ----------------------------------------- */
-
-            if (!response.ok) {
-
-                const errorData =
-                    await response
-                        .json()
-                        .catch(
-                            function () {
-                                return null;
-                            }
-                        );
-
-
-                console.error(
-                    "API error:",
-                    response.status,
-                    errorData
-                );
-
-
-                /*
-                   400 or 404 means the selected
-                   request cannot currently be
-                   supported by the dataset.
-                */
-
-                if (
-                    response.status === 400 ||
-                    response.status === 404
-                ) {
-
-                    await keepLoadingForFiveSeconds(
-                        startTime
-                    );
-
-
-                    showUnavailablePage(
-                        request.commodity,
-                        request.market,
-                        request.target_year,
-                        getMonthName(
-                            request.target_month
-                        )
-                    );
-
-
-                    return;
-                }
-
-
-                throw new Error(
-                    errorData?.detail ||
-                    "Prediction failed."
-                );
-            }
-
-
-            /* -----------------------------------------
-               READ API RESPONSE
-               ----------------------------------------- */
-
-            const data =
-                await response.json();
-
-
-            console.log(
-                "Prediction response:",
-                data
-            );
-
-
-            const predictions =
-                data.predictions || [];
-
-
-            /*
-               Only predictions containing a real
-               numeric prediction are considered
-               usable.
-            */
-
-            const usablePredictions =
-                predictions.filter(
-                    function (item) {
-
-                        return (
-                            item &&
-                            item.prediction !== null &&
-                            item.prediction !== undefined &&
-                            Number.isFinite(
-                                Number(
-                                    item.prediction
-                                )
-                            )
-                        );
-                    }
-                );
-
-
-            console.log(
-                "Total predictions:",
-                predictions.length
-            );
-
-
-            console.log(
-                "Usable predictions:",
-                usablePredictions.length
-            );
-
-
-            /* -----------------------------------------
-               NO USABLE DATA
-               ----------------------------------------- */
-
-            if (
-                usablePredictions.length === 0
-            ) {
-
-                console.warn(
-                    "No usable prediction was returned."
-                );
-
-
-                await keepLoadingForFiveSeconds(
-                    startTime
-                );
-
-
-                showUnavailablePage(
-                    request.commodity,
-                    request.market,
-                    request.target_year,
-                    getMonthName(
-                        request.target_month
-                    )
-                );
-
-
-                return;
-            }
-
-
-            /* -----------------------------------------
-               DATA IS AVAILABLE
-               ----------------------------------------- */
-
-            await keepLoadingForFiveSeconds(
-                startTime
-            );
-
-
-            displayResults(
-                data
-            );
-
-
-            showPage("results");
-
-
-        } catch (error) {
-
-            console.error(
-                "Prediction error:",
-                error
-            );
-
-
-            /*
-               Keep the loading screen visible
-               for at least five seconds.
-            */
-
-            await keepLoadingForFiveSeconds(
-                startTime
-            );
-
-
-            showPage("prediction");
-
-
-            showError(
-                error.message ||
-                "Prediction failed. Please try again."
-            );
-        }
-    }
-
-
-    /* =====================================================
-       FIVE SECOND LOADING
-       ===================================================== */
-
-    async function keepLoadingForFiveSeconds(
-        startTime
-    ) {
-
-        const elapsed =
-            Date.now() -
-            startTime;
-
-
-        const remaining =
-            Math.max(
-                0,
-                5000 - elapsed
-            );
-
-
-        if (remaining > 0) {
-
-            await wait(
-                remaining
-            );
-        }
-    }
-
-
-    /* =====================================================
-       DATA NOT AVAILABLE PAGE
-       ===================================================== */
-
-    function showUnavailablePage(
-        commodity,
-        market,
-        year,
-        month
-    ) {
-
-        console.log(
-            "Showing Data Not Available page."
-        );
-
-
-        let page =
-            document.getElementById(
-                "unavailable-page"
-            );
-
-
-        /*
-           Create the page the first time.
-        */
-
-        if (!page) {
-
-            page =
-                document.createElement(
-                    "section"
-                );
-
-
-            page.id =
-                "unavailable-page";
-
-
-            page.className =
-                "page hidden";
-
-
-            const main =
-                document.querySelector(
-                    "main"
-                );
-
-
-            if (main) {
-
-                main.appendChild(
-                    page
-                );
-
-            } else {
-
-                document.body.appendChild(
-                    page
-                );
-            }
-        }
-
-
-        /*
-           Rebuild the content every time.
-           This means the selected commodity,
-           market and date are always correct.
-        */
-
-        page.innerHTML = `
-
-            <div style="
-                min-height: 75vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 60px 24px;
-                box-sizing: border-box;
-            ">
-
-                <div style="
-                    max-width: 760px;
-                    width: 100%;
-                    text-align: center;
-                    background: #ffffff;
-                    border: 1px solid #dfe8df;
-                    border-radius: 24px;
-                    padding: 60px 40px;
-                    box-shadow:
-                        0 20px 60px
-                        rgba(20, 70, 35, 0.10);
-                    box-sizing: border-box;
-                ">
-
-                    <div style="
-                        width: 76px;
-                        height: 76px;
-                        margin: 0 auto 25px;
-                        border-radius: 50%;
-                        background: #fff4df;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 38px;
-                    ">
-                        📊
-                    </div>
-
-
-                    <div style="
-                        color: #347a4a;
-                        font-size: 14px;
-                        font-weight: 800;
-                        letter-spacing: 2px;
-                        text-transform: uppercase;
-                        margin-bottom: 14px;
-                    ">
-                        DATA NOT AVAILABLE
-                    </div>
-
-
-                    <h1 style="
-                        margin: 0 0 20px;
-                        color: #16351f;
-                        font-size: clamp(
-                            32px,
-                            5vw,
-                            48px
-                        );
-                        line-height: 1.1;
-                    ">
-                        We’re Sorry
-                    </h1>
-
-
-                    <p style="
-                        color: #5e7064;
-                        font-size: 18px;
-                        line-height: 1.7;
-                        margin: 0 auto 24px;
-                        max-width: 650px;
-                    ">
-                        The selected commodity, market,
-                        or target period is not currently
-                        available in our dataset.
-                    </p>
-
-
-                    <div style="
-                        background: #f4f8f4;
-                        border-radius: 16px;
-                        padding: 18px 22px;
-                        margin: 25px auto;
-                        max-width: 560px;
-                        text-align: left;
-                    ">
-
-                        <div style="
-                            margin-bottom: 8px;
-                            color: #6b7b70;
-                            font-size: 14px;
-                        ">
-                            Selected request
-                        </div>
-
-
-                        <strong style="
-                            color: #173b22;
-                            font-size: 17px;
-                        ">
-                            ${escapeHtml(
-                                commodity
-                            )}
-                        </strong>
-
-
-                        <span style="
-                            color: #819087;
-                        ">
-                            &nbsp;•&nbsp;
-                        </span>
-
-
-                        <strong style="
-                            color: #173b22;
-                            font-size: 17px;
-                        ">
-                            ${escapeHtml(
-                                market
-                            )}
-                        </strong>
-
-
-                        <div style="
-                            color: #6b7b70;
-                            margin-top: 8px;
-                        ">
-                            ${escapeHtml(
-                                month
-                            )}
-                            ${escapeHtml(
-                                String(year)
-                            )}
-                        </div>
-
-                    </div>
-
-
-                    <p style="
-                        color: #637269;
-                        font-size: 16px;
-                        line-height: 1.7;
-                        margin: 0 auto 30px;
-                        max-width: 620px;
-                    ">
-                        We will upgrade our dataset
-                        as soon as possible so that
-                        more food commodities, markets,
-                        and periods can be supported.
-                        Thank you for your understanding.
-                    </p>
-
-
-                    <button
-                        id="return-to-prediction-button"
-                        class="primary-button"
-                        type="button"
-                        style="
-                            border: none;
-                            cursor: pointer;
-                        "
-                    >
-                        ← Return to Prediction
-                    </button>
-
-                </div>
-
-            </div>
-
-        `;
-
-
-        /*
-           Show the unavailable page.
-        */
-
-        showPage(
-            "unavailable"
-        );
-
-
-        /*
-           Connect the return button.
-        */
-
-        const returnButton =
-            document.getElementById(
-                "return-to-prediction-button"
-            );
-
-
-        if (returnButton) {
-
-            returnButton.addEventListener(
-                "click",
-                function () {
-
-                    console.log(
-                        "Returning to prediction page."
-                    );
-
-
-                    clearError();
-
-
-                    showPage(
-                        "prediction"
-                    );
-                }
-            );
-        }
-    }
-
-
-    /* =====================================================
-       DISPLAY RESULTS
-       ===================================================== */
-
-    function displayResults(
-        data
-    ) {
-
-        console.log(
-            "Displaying results:",
-            data
-        );
-
-
-        const results =
-            data.predictions || [];
-
-
-        const usableResults =
-            results.filter(
-                function (item) {
-
-                    return (
-                        item &&
-                        item.prediction !== null &&
-                        item.prediction !== undefined &&
-                        Number.isFinite(
-                            Number(
-                                item.prediction
-                            )
-                        )
-                    );
-                }
-            );
-
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const commodityElement = document.getElementById("commodity");
+        const marketElement = document.getElementById("market");
+        const monthElement = document.getElementById("month");
+        const yearElement = document.getElementById("year");
+        const modelElement = document.getElementById("model");
 
         if (
-            usableResults.length === 0
+            !commodityElement ||
+            !marketElement ||
+            !monthElement ||
+            !yearElement
         ) {
-
-            console.warn(
-                "No usable results."
-            );
-
-
+            console.error("Prediction form fields are missing.");
             return;
         }
-
-
-        /*
-           Store results globally.
-        */
-
-        window.foodPriceResults =
-            results;
-
-
-        /*
-           Store default model.
-        */
-
-        let defaultModel =
-            data.default_model ||
-            "lstm";
-
-
-        /*
-           Find the default model if it has
-           a valid prediction.
-        */
-
-        let selected =
-            usableResults.find(
-                function (item) {
-
-                    return (
-                        item.model_id ===
-                        defaultModel
-                    );
-                }
-            );
-
-
-        /*
-           If the default model isn't usable,
-           use the first working model.
-        */
-
-        if (!selected) {
-
-            selected =
-                usableResults[0];
-        }
-
-
-        if (selected) {
-
-            window.selectedFoodPriceModel =
-                selected.model_id;
-        }
-
-
-        populateModelSelector(
-            usableResults
-        );
-
-
-        renderSelectedResult();
-
-        renderAllModels(
-            usableResults
-        );
-    }
-
-
-    /* =====================================================
-       MODEL SELECTOR
-       ===================================================== */
-
-    function populateModelSelector(
-        results
-    ) {
-
-        if (!modelSelect) {
-            return;
-        }
-
-
-        modelSelect.innerHTML = "";
-
-
-        results.forEach(
-            function (result) {
-
-                const option =
-                    document.createElement(
-                        "option"
-                    );
-
-
-                option.value =
-                    result.model_id;
-
-
-                option.textContent =
-                    result.model_name;
-
-
-                if (
-                    result.model_id ===
-                    window.selectedFoodPriceModel
-                ) {
-
-                    option.selected =
-                        true;
-                }
-
-
-                modelSelect.appendChild(
-                    option
-                );
-            }
-        );
-    }
-
-
-    if (modelSelect) {
-
-        modelSelect.addEventListener(
-            "change",
-            function () {
-
-                console.log(
-                    "Model changed:",
-                    this.value
-                );
-
-
-                window.selectedFoodPriceModel =
-                    this.value;
-
-
-                renderSelectedResult();
-
-
-                renderAllModels(
-                    window.foodPriceResults
-                );
-            }
-        );
-    }
-
-
-    /* =====================================================
-       RENDER SELECTED MODEL
-       ===================================================== */
-
-    function renderSelectedResult() {
-
-        const results =
-            window.foodPriceResults ||
-            [];
-
 
         const modelId =
-            window.selectedFoodPriceModel;
+            modelElement?.value ||
+            window.selectedFoodPriceModel ||
+            "lstm";
+
+        const request = {
+            commodity: commodityElement.value,
+            market: marketElement.value,
+            month: parseInt(monthElement.value),
+            year: parseInt(yearElement.value),
+            model_id: modelId
+        };
+
+        await makePrediction(request);
+    });
+}
 
 
-        const result =
-            results.find(
-                function (item) {
+// ============================================================
+// MAKE ONE PREDICTION
+// ============================================================
 
-                    return (
-                        item.model_id ===
-                        modelId
-                    );
+async function makePrediction(request) {
+    try {
+        showLoading();
+
+        // Save the request so that changing the model can
+        // repeat the same prediction with ONLY the new model.
+        window.foodPriceLastRequest = {
+            ...request
+        };
+
+        const modelId =
+            request.model_id ||
+            window.selectedFoodPriceModel ||
+            "lstm";
+
+        window.selectedFoodPriceModel = modelId;
+
+        const payload = {
+            commodity: request.commodity,
+            market: request.market,
+            month: request.month,
+            year: request.year,
+            model_id: modelId
+        };
+
+        console.log("Sending prediction request:", payload);
+
+        // IMPORTANT:
+        // Use /api/predict, NOT /api/predict/all.
+        //
+        // /api/predict/all loads every model and causes the
+        // Render 512 MB instance to run out of memory.
+        const response = await fetch("/api/predict", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            let errorMessage = `Prediction failed (${response.status})`;
+
+            try {
+                const errorData = await response.json();
+
+                if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                } else if (errorData.message) {
+                    errorMessage = errorData.message;
                 }
-            );
-
-
-        if (!result) {
-
-            console.warn(
-                "Selected model result not found."
-            );
-
-            return;
-        }
-
-
-        setText(
-            "result-title",
-            result.commodity +
-            " Price Prediction"
-        );
-
-
-        setText(
-            "result-subtitle",
-            result.market +
-            " • " +
-            formatDate(
-                result.target_date
-            )
-        );
-
-
-        setText(
-            "main-prediction",
-            formatNumber(
-                result.prediction
-            )
-        );
-
-
-        setText(
-            "prediction-unit",
-            result.unit ||
-            "ETB/KG"
-        );
-
-
-        if (
-            result.actual_available
-        ) {
-
-            setText(
-                "prediction-status",
-                "Historical target — actual price available"
-            );
-
-        } else {
-
-            setText(
-                "prediction-status",
-                "Future forecast — actual price not available yet"
-            );
-        }
-
-
-        /* -----------------------------------------
-           ACTUAL PRICE
-           ----------------------------------------- */
-
-        if (
-            result.actual_price !== null &&
-            result.actual_price !== undefined
-        ) {
-
-            setText(
-                "actual-price",
-                formatNumber(
-                    result.actual_price
-                ) +
-                " " +
-                (
-                    result.unit ||
-                    "ETB/KG"
-                )
-            );
-
-        } else {
-
-            setText(
-                "actual-price",
-                "Not available yet"
-            );
-        }
-
-
-        /* -----------------------------------------
-           ABSOLUTE ERROR
-           ----------------------------------------- */
-
-        if (
-            result.absolute_error !== null &&
-            result.absolute_error !== undefined
-        ) {
-
-            setText(
-                "absolute-error",
-                formatNumber(
-                    result.absolute_error
-                ) +
-                " " +
-                (
-                    result.unit ||
-                    "ETB/KG"
-                )
-            );
-
-        } else {
-
-            setText(
-                "absolute-error",
-                "Not available"
-            );
-        }
-
-
-        /* -----------------------------------------
-           PERCENTAGE ERROR
-           ----------------------------------------- */
-
-        if (
-            result.percentage_error !== null &&
-            result.percentage_error !== undefined
-        ) {
-
-            setText(
-                "percentage-error",
-                formatNumber(
-                    result.percentage_error
-                ) +
-                "%"
-            );
-
-        } else {
-
-            setText(
-                "percentage-error",
-                "Not available"
-            );
-        }
-
-
-        /* -----------------------------------------
-           DETAILS
-           ----------------------------------------- */
-
-        setText(
-            "detail-commodity",
-            result.commodity
-        );
-
-
-        setText(
-            "detail-market",
-            result.market
-        );
-
-
-        setText(
-            "detail-target-date",
-            formatDate(
-                result.target_date
-            )
-        );
-
-
-        setText(
-            "detail-source-date",
-            formatDate(
-                result.source_date
-            )
-        );
-
-
-        setText(
-            "detail-model",
-            result.model_name
-        );
-
-
-        /* -----------------------------------------
-           MODEL PERFORMANCE
-           ----------------------------------------- */
-
-        const performance =
-            (
-                window.foodPricePerformance ||
-                []
-            ).find(
-                function (item) {
-
-                    return (
-                        item.model_id ===
-                        result.model_id
-                    );
-                }
-            );
-
-
-        if (performance) {
-
-            setText(
-                "metric-mae",
-                Number(
-                    performance.mae
-                ).toFixed(3)
-            );
-
-
-            setText(
-                "metric-mse",
-                Number(
-                    performance.mse
-                ).toFixed(3)
-            );
-
-
-            setText(
-                "metric-rmse",
-                Number(
-                    performance.rmse
-                ).toFixed(3)
-            );
-
-
-            setText(
-                "metric-r2",
-                Number(
-                    performance.r2
-                ).toFixed(3)
-            );
-        }
-
-
-        /* -----------------------------------------
-           ACTUAL VS PREDICTED
-           ----------------------------------------- */
-
-        const comparison =
-            document.getElementById(
-                "actual-predicted-section"
-            );
-
-
-        if (
-            comparison &&
-            result.actual_available &&
-            result.actual_price !== null &&
-            result.prediction !== null
-        ) {
-
-            comparison.classList.remove(
-                "hidden"
-            );
-
-
-            const actual =
-                Number(
-                    result.actual_price
-                );
-
-
-            const prediction =
-                Number(
-                    result.prediction
-                );
-
-
-            const maximum =
-                Math.max(
-                    actual,
-                    prediction,
-                    1
-                );
-
-
-            const actualBar =
-                document.getElementById(
-                    "actual-bar"
-                );
-
-
-            const predictedBar =
-                document.getElementById(
-                    "predicted-bar"
-                );
-
-
-            if (actualBar) {
-
-                actualBar.style.width =
-                    (
-                        actual /
-                        maximum *
-                        100
-                    ) +
-                    "%";
+            } catch (error) {
+                console.error("Could not read error response:", error);
             }
 
-
-            if (predictedBar) {
-
-                predictedBar.style.width =
-                    (
-                        prediction /
-                        maximum *
-                        100
-                    ) +
-                    "%";
-            }
-
-
-            setText(
-                "visual-actual",
-                formatNumber(
-                    actual
-                ) +
-                " " +
-                (
-                    result.unit ||
-                    "ETB/KG"
-                )
-            );
-
-
-            setText(
-                "visual-predicted",
-                formatNumber(
-                    prediction
-                ) +
-                " " +
-                (
-                    result.unit ||
-                    "ETB/KG"
-                )
-            );
-
-
-        } else if (comparison) {
-
-            comparison.classList.add(
-                "hidden"
-            );
-        }
-    }
-
-
-    /* =====================================================
-       ALL MODEL CARDS
-       ===================================================== */
-
-    function renderAllModels(
-        results
-    ) {
-
-        const grid =
-            document.getElementById(
-                "models-grid"
-            );
-
-
-        if (!grid) {
-            return;
+            throw new Error(errorMessage);
         }
 
+        const rawData = await response.json();
 
-        grid.innerHTML = "";
+        console.log("Prediction response:", rawData);
 
+        hideLoading();
 
-        results.forEach(
-            function (result) {
+        /*
+         * The backend /api/predict endpoint returns ONE model result.
+         *
+         * The existing results page was designed around an array
+         * called "predictions", so we normalize the response here.
+         */
+        const data = {
+            ...rawData,
+            default_model: rawData.model_id || modelId,
+            predictions: [rawData]
+        };
 
-                if (
-                    result.prediction === null ||
-                    result.prediction === undefined
-                ) {
+        window.foodPriceLastResult = data;
 
-                    return;
-                }
+        displayResults(data);
 
+    } catch (error) {
+        console.error("Prediction error:", error);
 
-                const card =
-                    document.createElement(
-                        "div"
-                    );
+        hideLoading();
 
-
-                card.className =
-                    "model-card";
-
-
-                if (
-                    result.model_id ===
-                    window.selectedFoodPriceModel
-                ) {
-
-                    card.classList.add(
-                        "selected"
-                    );
-                }
-
-
-                const error =
-                    result.percentage_error !== null &&
-                    result.percentage_error !== undefined
-
-                        ? formatNumber(
-                            result.percentage_error
-                        ) + "%"
-
-                        : "N/A";
-
-
-                card.innerHTML = `
-
-                    <h3>
-                        ${escapeHtml(
-                            result.model_name
-                        )}
-                    </h3>
-
-                    <div class="model-prediction">
-                        ${formatNumber(
-                            result.prediction
-                        )}
-                        ${
-                            result.unit ||
-                            "ETB/KG"
-                        }
-                    </div>
-
-                    <p>
-                        Error:
-                        <strong>
-                            ${error}
-                        </strong>
-                    </p>
-
-                `;
-
-
-                card.addEventListener(
-                    "click",
-                    function () {
-
-                        console.log(
-                            "Model card clicked:",
-                            result.model_id
-                        );
-
-
-                        window.selectedFoodPriceModel =
-                            result.model_id;
-
-
-                        if (modelSelect) {
-
-                            modelSelect.value =
-                                result.model_id;
-                        }
-
-
-                        renderSelectedResult();
-
-
-                        renderAllModels(
-                            results
-                        );
-                    }
-                );
-
-
-                grid.appendChild(
-                    card
-                );
-            }
+        showUnavailable(
+            error.message ||
+            "Unable to make the prediction. Please try again."
         );
     }
+}
 
 
-    /* =====================================================
-       NEW PREDICTION
-       ===================================================== */
+// ============================================================
+// LOADING SCREEN
+// ============================================================
 
-    if (newPredictionButton) {
+function showLoading() {
+    const loadingPage = document.getElementById("loading-page");
 
-        newPredictionButton.addEventListener(
-            "click",
-            function () {
-
-                console.log(
-                    "New prediction clicked."
-                );
-
-
-                clearError();
-
-
-                showPage(
-                    "prediction"
-                );
-            }
-        );
+    if (loadingPage) {
+        loadingPage.classList.add("active");
     }
 
+    const pages = document.querySelectorAll(".page");
 
-    /* =====================================================
-       HELPERS
-       ===================================================== */
-
-    function setText(
-        id,
-        value
-    ) {
-
-        const element =
-            document.getElementById(
-                id
-            );
-
-
-        if (element) {
-
-            element.textContent =
-                value;
+    pages.forEach(page => {
+        if (page.id !== "loading-page") {
+            page.classList.remove("active");
         }
-    }
+    });
+
+    // Keep the AI loading experience visible for at least 5 seconds.
+    window.predictionLoadingStart = Date.now();
+}
 
 
-    function formatNumber(
-        value
-    ) {
+async function hideLoading() {
+    const start = window.predictionLoadingStart || Date.now();
 
-        if (
-            value === null ||
-            value === undefined ||
-            Number.isNaN(
-                Number(value)
-            )
-        ) {
+    const elapsed = Date.now() - start;
+    const minimumLoadingTime = 5000;
 
-            return "--";
-        }
-
-
-        return Number(value)
-            .toLocaleString(
-                undefined,
-                {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }
+    if (elapsed < minimumLoadingTime) {
+        await new Promise(resolve => {
+            setTimeout(
+                resolve,
+                minimumLoadingTime - elapsed
             );
+        });
     }
 
+    const loadingPage = document.getElementById("loading-page");
 
-    function formatDate(
-        value
-    ) {
+    if (loadingPage) {
+        loadingPage.classList.remove("active");
+    }
+}
 
-        if (!value) {
-            return "--";
+
+// ============================================================
+// RESULTS
+// ============================================================
+
+function displayResults(data) {
+    const resultsPage = document.getElementById("results-page");
+
+    if (!resultsPage) {
+        console.error("Results page not found.");
+        return;
+    }
+
+    const predictions = data.predictions || [];
+
+    if (predictions.length === 0) {
+        showUnavailable("No prediction result was returned.");
+        return;
+    }
+
+    const prediction = predictions[0];
+
+    populateResultDetails(prediction);
+
+    populateModelSelector(prediction);
+
+    resultsPage.classList.add("active");
+
+    const pages = document.querySelectorAll(".page");
+
+    pages.forEach(page => {
+        if (page.id !== "results-page") {
+            page.classList.remove("active");
         }
+    });
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
 
 
-        const date =
-            new Date(value);
+// ============================================================
+// RESULT DETAILS
+// ============================================================
 
+function populateResultDetails(prediction) {
+    /*
+     * The exact element IDs may differ depending on the current
+     * HTML. We check multiple common IDs so the frontend remains
+     * compatible with the existing page.
+     */
 
-        if (
-            Number.isNaN(
-                date.getTime()
-            )
-        ) {
-
-            return value;
-        }
-
-
-        return date.toLocaleDateString(
-            undefined,
-            {
-                year: "numeric",
-                month: "long",
-                day: "numeric"
-            }
-        );
-    }
-
-
-    function getMonthName(
-        monthNumber
-    ) {
-
-        const months = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December"
-        ];
-
-
-        return (
-            months[
-                Number(monthNumber) - 1
-            ] ||
-            "Selected month"
-        );
-    }
-
-
-    function escapeHtml(
-        value
-    ) {
-
-        return String(value)
-            .replace(
-                /&/g,
-                "&amp;"
-            )
-            .replace(
-                /</g,
-                "&lt;"
-            )
-            .replace(
-                />/g,
-                "&gt;"
-            )
-            .replace(
-                /"/g,
-                "&quot;"
-            )
-            .replace(
-                /'/g,
-                "&#039;"
-            );
-    }
-
-
-    function wait(
-        milliseconds
-    ) {
-
-        return new Promise(
-            function (resolve) {
-
-                setTimeout(
-                    resolve,
-                    milliseconds
-                );
-            }
-        );
-    }
-
-
-    /* =====================================================
-       LOAD MODEL PERFORMANCE
-       ===================================================== */
-
-    async function loadPerformance() {
-
-        try {
-
-            const response =
-                await fetch(
-                    "/api/models"
-                );
-
-
-            if (!response.ok) {
-
-                return;
-            }
-
-
-            const data =
-                await response.json();
-
-
-            window.foodPricePerformance =
-                data.models || [];
-
-
-            console.log(
-                "Model performance loaded:",
-                window.foodPricePerformance.length
-            );
-
-
-        } catch (error) {
-
-            console.error(
-                "Performance loading error:",
-                error
-            );
-
-
-            window.foodPricePerformance =
-                [];
-        }
-    }
-
-
-    loadPerformance();
-
-
-    console.log(
-        "Food Price AI initialization complete."
+    setText(
+        [
+            "result-commodity",
+            "prediction-commodity"
+        ],
+        prediction.commodity
     );
 
+    setText(
+        [
+            "result-market",
+            "prediction-market"
+        ],
+        prediction.market
+    );
+
+    setText(
+        [
+            "result-month",
+            "prediction-month"
+        ],
+        formatMonth(prediction.month)
+    );
+
+    setText(
+        [
+            "result-year",
+            "prediction-year"
+        ],
+        prediction.year
+    );
+
+    setText(
+        [
+            "result-model",
+            "prediction-model",
+            "selected-model"
+        ],
+        formatModelName(
+            prediction.model_id ||
+            prediction.model ||
+            window.selectedFoodPriceModel
+        )
+    );
+
+    const predictedPrice =
+        prediction.predicted_price ??
+        prediction.prediction ??
+        prediction.price;
+
+    if (predictedPrice !== undefined && predictedPrice !== null) {
+        setText(
+            [
+                "predicted-price",
+                "prediction-price",
+                "result-price"
+            ],
+            formatPrice(predictedPrice)
+        );
+    }
+
+    const actualPrice =
+        prediction.actual_price ??
+        prediction.actual;
+
+    if (actualPrice !== undefined && actualPrice !== null) {
+        setText(
+            [
+                "actual-price",
+                "result-actual"
+            ],
+            formatPrice(actualPrice)
+        );
+    }
+
+    const absoluteError =
+        prediction.absolute_error ??
+        prediction.error;
+
+    if (absoluteError !== undefined && absoluteError !== null) {
+        setText(
+            [
+                "absolute-error",
+                "result-error"
+            ],
+            formatPrice(absoluteError)
+        );
+    }
+
+    const percentageError =
+        prediction.percentage_error ??
+        prediction.percent_error ??
+        prediction.pct_error;
+
+    if (
+        percentageError !== undefined &&
+        percentageError !== null
+    ) {
+        setText(
+            [
+                "percentage-error",
+                "result-percentage-error"
+            ],
+            `${Number(percentageError).toFixed(2)}%`
+        );
+    }
+
+    displayHistoricalInformation(prediction);
+}
+
+
+// ============================================================
+// HISTORICAL INFORMATION
+// ============================================================
+
+function displayHistoricalInformation(prediction) {
+    const actualPrice =
+        prediction.actual_price ??
+        prediction.actual;
+
+    const historicalSection =
+        document.getElementById("historical-section");
+
+    if (!historicalSection) {
+        return;
+    }
+
+    if (
+        actualPrice !== undefined &&
+        actualPrice !== null &&
+        actualPrice !== ""
+    ) {
+        historicalSection.style.display = "block";
+    } else {
+        historicalSection.style.display = "none";
+    }
+}
+
+
+// ============================================================
+// MODEL SELECTOR
+// ============================================================
+
+function setupModelSelector() {
+    const selector =
+        document.getElementById("model-selector") ||
+        document.getElementById("model");
+
+    if (!selector) {
+        return;
+    }
+
+    selector.addEventListener("change", async function () {
+        const selectedModel = this.value;
+
+        if (!selectedModel) {
+            return;
+        }
+
+        window.selectedFoodPriceModel = selectedModel;
+
+        /*
+         * If the user has already made a prediction, repeat the
+         * exact same request using ONLY the newly selected model.
+         */
+        if (window.foodPriceLastRequest) {
+            const newRequest = {
+                ...window.foodPriceLastRequest,
+                model_id: selectedModel
+            };
+
+            await makePrediction(newRequest);
+        }
+    });
+}
+
+
+// ============================================================
+// POPULATE MODEL SELECTOR
+// ============================================================
+
+function populateModelSelector(prediction) {
+    const selector =
+        document.getElementById("model-selector") ||
+        document.getElementById("model");
+
+    if (!selector) {
+        return;
+    }
+
+    const selectedModel =
+        prediction?.model_id ||
+        prediction?.model ||
+        window.selectedFoodPriceModel ||
+        "lstm";
+
+    window.selectedFoodPriceModel = selectedModel;
+
+    /*
+     * Use performance metadata only.
+     *
+     * This does NOT request or load any ML model files.
+     */
+    const performance = window.foodPricePerformance || [];
+
+    if (performance.length > 0) {
+        selector.innerHTML = "";
+
+        performance.forEach(model => {
+            const option = document.createElement("option");
+
+            option.value =
+                model.model_id ||
+                model.id ||
+                model.name;
+
+            option.textContent =
+                model.display_name ||
+                formatModelName(
+                    model.model_id ||
+                    model.id ||
+                    model.name
+                );
+
+            if (option.value === selectedModel) {
+                option.selected = true;
+            }
+
+            selector.appendChild(option);
+        });
+
+        return;
+    }
+
+    // Fallback list if the performance endpoint is unavailable.
+    const models = [
+        {
+            id: "lstm",
+            name: "LSTM"
+        },
+        {
+            id: "gradient_boosting",
+            name: "Gradient Boosting"
+        },
+        {
+            id: "stacking",
+            name: "Stacking"
+        },
+        {
+            id: "linear_regression",
+            name: "Linear Regression"
+        },
+        {
+            id: "random_forest",
+            name: "Random Forest"
+        },
+        {
+            id: "neural_network",
+            name: "Neural Network"
+        },
+        {
+            id: "linear_regression_round1",
+            name: "Linear Regression (Round 1)"
+        },
+        {
+            id: "random_forest_round1",
+            name: "Random Forest (Round 1)"
+        }
+    ];
+
+    selector.innerHTML = "";
+
+    models.forEach(model => {
+        const option = document.createElement("option");
+
+        option.value = model.id;
+        option.textContent = model.name;
+
+        if (model.id === selectedModel) {
+            option.selected = true;
+        }
+
+        selector.appendChild(option);
+    });
+}
+
+
+// ============================================================
+// LOAD MODEL PERFORMANCE
+// ============================================================
+
+async function loadModelPerformance() {
+    try {
+        const response = await fetch("/api/performance");
+
+        if (!response.ok) {
+            console.warn(
+                "Model performance endpoint returned:",
+                response.status
+            );
+
+            return;
+        }
+
+        const data = await response.json();
+
+        /*
+         * Store performance metadata only.
+         * This endpoint should not load the actual model files.
+         */
+        if (Array.isArray(data)) {
+            window.foodPricePerformance = data;
+        } else if (Array.isArray(data.models)) {
+            window.foodPricePerformance = data.models;
+        } else if (Array.isArray(data.performance)) {
+            window.foodPricePerformance = data.performance;
+        } else {
+            window.foodPricePerformance = [];
+        }
+
+        console.log(
+            "Loaded model performance metadata:",
+            window.foodPricePerformance
+        );
+
+    } catch (error) {
+        console.warn(
+            "Could not load model performance:",
+            error
+        );
+    }
+}
+
+
+// ============================================================
+// UNAVAILABLE PAGE
+// ============================================================
+
+function showUnavailable(message) {
+    const unavailablePage =
+        document.getElementById("unavailable-page");
+
+    if (unavailablePage) {
+        unavailablePage.classList.add("active");
+    }
+
+    const pages = document.querySelectorAll(".page");
+
+    pages.forEach(page => {
+        if (page.id !== "unavailable-page") {
+            page.classList.remove("active");
+        }
+    });
+
+    setText(
+        [
+            "unavailable-message",
+            "error-message"
+        ],
+        message ||
+        "This prediction is currently unavailable."
+    );
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+function setText(elementIds, value) {
+    const ids = Array.isArray(elementIds)
+        ? elementIds
+        : [elementIds];
+
+    for (const id of ids) {
+        const element = document.getElementById(id);
+
+        if (element) {
+            element.textContent =
+                value !== undefined &&
+                value !== null
+                    ? value
+                    : "";
+
+            return;
+        }
+    }
+}
+
+
+function formatPrice(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return value;
+    }
+
+    return `${number.toFixed(2)} ETB/KG`;
+}
+
+
+function formatMonth(month) {
+    const monthNumber = Number(month);
+
+    if (
+        !Number.isInteger(monthNumber) ||
+        monthNumber < 1 ||
+        monthNumber > 12
+    ) {
+        return month;
+    }
+
+    const months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+    ];
+
+    return months[monthNumber - 1];
+}
+
+
+function formatModelName(modelId) {
+    if (!modelId) {
+        return "Unknown Model";
+    }
+
+    const names = {
+        "gradient_boosting": "Gradient Boosting",
+        "stacking": "Stacking",
+        "linear_regression": "Linear Regression",
+        "random_forest": "Random Forest",
+        "lstm": "LSTM",
+        "neural_network": "Neural Network",
+        "linear_regression_round1":
+            "Linear Regression (Round 1)",
+        "random_forest_round1":
+            "Random Forest (Round 1)"
+    };
+
+    if (names[modelId]) {
+        return names[modelId];
+    }
+
+    return modelId
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+
+// ============================================================
+// BACK TO HOME
+// ============================================================
+
+document.addEventListener("click", event => {
+    const button = event.target.closest(
+        "#back-home, .back-home, [data-action='home']"
+    );
+
+    if (!button) {
+        return;
+    }
+
+    event.preventDefault();
+
+    showPage("home");
 });
+
+
+// ============================================================
+// DEBUGGING
+// ============================================================
+
+console.log(
+    "Food Price AI frontend loaded."
+);
+
+console.log(
+    "Single-model prediction endpoint: /api/predict"
+);
